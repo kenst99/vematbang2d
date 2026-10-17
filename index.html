@@ -1099,10 +1099,23 @@ def build_scene(plan, opts=None):
     # --- sàn & trần ---
     allpts = []
     for w in walls: allpts += [(w['x1'], w['y1']), (w['x2'], w['y2'])]
-    for r in rooms:
-        pts = [(float(p[0]), float(p[1])) for p in r['pts']]; allpts += pts
+    def _pip(px, py, poly):
+        ins = False
+        for i in range(len(poly)):
+            x1, y1 = poly[i]; x2, y2 = poly[(i + 1) % len(poly)]
+            if (y1 > py) != (y2 > py) and px < (x2 - x1) * (py - y1) / ((y2 - y1) or 1e-9) + x1: ins = not ins
+        return ins
+    def _area(poly):
+        return abs(sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly)))) / 2
+    _polys = [[(float(p[0]), float(p[1])) for p in r['pts']] for r in rooms]
+    _cen = [(sum(p[0] for p in q) / len(q), sum(p[1] for p in q) / len(q)) for q in _polys]
+    _ar = [_area(q) for q in _polys]
+    for ri, r in enumerate(rooms):
+        pts = _polys[ri]; allpts += pts
+        # phòng nằm trong phòng khác (vd. sân vườn bao quanh cả nhà) -> nâng sàn lên một lớp để không bị trùng mặt
+        depth = sum(1 for rj in range(len(rooms)) if rj != ri and (_ar[rj] > _ar[ri] or (_ar[rj] == _ar[ri] and rj < ri)) and _pip(_cen[ri][0], _cen[ri][1], _polys[rj]))
         b = bmesh.new()
-        vs = [b.verts.new((x * S_, -y * S_, .004)) for x, y in pts]
+        vs = [b.verts.new((x * S_, -y * S_, .004 + depth * .02)) for x, y in pts]
         try:
             f = b.faces.new(vs)
             b.normal_update()
