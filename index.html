@@ -1142,6 +1142,9 @@ def setup_render(opts):
         try:
             sc.cycles.samples = int(opts.get('samples', 400 if q == 'best' else 96))
             sc.cycles.use_denoising = True
+            try: sc.cycles.denoiser = 'OPENIMAGEDENOISE'
+            except Exception: pass
+            _DEV_PREF['v'] = str(opts.get('device', _DEV_PREF['v']) or 'auto').lower()
             sc.cycles.use_adaptive_sampling = True
         except Exception:
             pass
@@ -1154,11 +1157,20 @@ def setup_render(opts):
     try: sc.view_settings.exposure = float(opts.get('exposure', 0))
     except Exception: pass
 
+_GPU_TRY = ['OPTIX', 'CUDA', 'HIP', 'METAL', 'ONEAPI']
+_GPU_BAD = set()
+_DEV_PREF = {'v': 'auto'}
+
 def _gpu(sc):
-    if not opts_gpu_allowed(): return 'CPU'
+    """Chọn thiết bị render. Bỏ qua loại GPU đã lỗi (vd. OptiX) để thử loại khác, cuối cùng là CPU."""
+    if _DEV_PREF['v'] == 'cpu':
+        try: sc.cycles.device = 'CPU'
+        except Exception: pass
+        return 'CPU'
     try:
         pr = bpy.context.preferences.addons['cycles'].preferences
-        for t in ('OPTIX', 'CUDA', 'HIP', 'METAL', 'ONEAPI'):
+        for t in _GPU_TRY:
+            if t in _GPU_BAD: continue
             try: pr.compute_device_type = t
             except Exception: continue
             try: pr.get_devices()
@@ -1174,7 +1186,7 @@ def _gpu(sc):
     return 'CPU'
 
 def opts_gpu_allowed():
-    return True
+    return _DEV_PREF['v'] != 'cpu'
 
 def _ui_view():
     try:
@@ -1188,10 +1200,14 @@ def _ui_view():
     except Exception:
         pass
 
-def render_to(path):
+def _render_once(path):
     sc = bpy.context.scene
     sc.render.filepath = path
     sc.render.image_settings.file_format = 'PNG'
+    try:
+        if os.path.exists(path): os.remove(path)
+    except Exception:
+        pass
     ov = None
     try:
         wm = bpy.context.window_manager
@@ -1203,7 +1219,37 @@ def render_to(path):
         with ov: bpy.ops.render.render(write_still=True)
     else:
         bpy.ops.render.render(write_still=True)
-    return path
+    if not os.path.exists(path):
+        raise RuntimeError('Render không tạo ra ảnh (thường do lỗi GPU/OptiX)')
+
+def render_to(path):
+    """Render; nếu GPU (OptiX/CUDA…) lỗi thì tự đổi loại khác rồi cuối cùng là CPU."""
+    sc = bpy.context.scene
+    last = None
+    for _ in range(len(_GPU_TRY) + 2):
+        try:
+            _render_once(path)
+            return path
+        except Exception as e:
+            last = e
+            if getattr(sc, 'cycles', None) is None or sc.render.engine != 'CYCLES':
+                raise
+            cur = None
+            try:
+                if sc.cycles.device == 'GPU':
+                    cur = bpy.context.preferences.addons['cycles'].preferences.compute_device_type
+            except Exception:
+                pass
+            print('[MatBang2D] Render lỗi (%s): %s' % (cur or 'CPU', str(e)[:200]))
+            if cur and cur != 'NONE':
+                _GPU_BAD.add(cur)
+                dev = _gpu(sc)
+                print('[MatBang2D] Thử lại bằng:', dev)
+                continue
+            if sc.cycles.device == 'GPU':
+                sc.cycles.device = 'CPU'; continue
+            raise
+    raise last
 
 def _argv():
     a = sys.argv; a = a[a.index('--') + 1:] if '--' in a else []
@@ -1217,7 +1263,7 @@ def _argv():
 
 def run_script(plan, opts):
     cli = _argv(); opts = dict(opts)
-    for k in ('view', 'light', 'quality'):
+    for k in ('view', 'light', 'quality', 'device'):
         if k in cli: opts[k] = cli[k]
     for k in ('res', 'samples'):
         if k in cli: opts[k] = int(cli[k])
