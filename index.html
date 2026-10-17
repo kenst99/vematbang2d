@@ -490,36 +490,42 @@ def std_mats():
         'b0': lambda: mat('b0', hex2lin('#8e3b2f'), .6), 'b1': lambda: mat('b1', hex2lin('#2f5d8e'), .6),
         'b2': lambda: mat('b2', hex2lin('#d8b25a'), .6), 'b3': lambda: mat('b3', hex2lin('#3d7a55'), .6),
         'b4': lambda: mat('b4', hex2lin('#e8e2d4'), .6),
+        'grass': lambda: mat('grass', hex2lin('#5f9a47'), .85),
+        'sand': lambda: mat('sand', hex2lin('#e3cf9a'), .9),
+        'yellow': lambda: mat('yellow', hex2lin('#f2c230'), .35),
+        'blue': lambda: mat('blue', hex2lin('#2f7de1'), .35),
+        'pink': lambda: mat('pink', hex2lin('#e8648a'), .35),
+        'leaf': lambda: mat('leaf', hex2lin('#3f8a3a'), .7),
+        'trunk': lambda: mat('trunk', hex2lin('#7a5230'), .8),
+        'roofred': lambda: mat('roofred', hex2lin('#b9442b'), .5),
     }
 
 # ---------- bmesh helpers (toạ độ kiểu bản vẽ: x phải, y xuống; đổi sang Blender: y -> -y) ----------
-def _mi(bm, n0, mi):
-    bm.faces.ensure_lookup_table()
-    for i in range(n0, len(bm.faces)):
-        bm.faces[i].material_index = mi
+def _mi(bm, res, mi):
+    # bmesh tái dùng ô nhớ cũ nên mặt mới không nằm cuối danh sách -> lấy mặt qua các đỉnh vừa tạo
+    for v in res.get('verts', []):
+        for f in v.link_faces:
+            f.material_index = mi
 
 def add_box(bm, cx, cy, z0, L, T, H, ang, mi):
     if L <= 0 or T <= 0 or H <= 0:
         return
     M = Matrix.Translation((cx * S_, -cy * S_, (z0 + H / 2) * S_)) @ Matrix.Rotation(-ang, 4, 'Z') @ Matrix.Diagonal((L * S_, T * S_, H * S_, 1))
-    n0 = len(bm.faces)
-    bmesh.ops.create_cube(bm, size=1.0, matrix=M)
-    _mi(bm, n0, mi)
+    res = bmesh.ops.create_cube(bm, size=1.0, matrix=M)
+    _mi(bm, res, mi)
 
 def add_cyl(bm, cx, cy, z, rx, ry, h, mi, axis='Z', ang=0.0, seg=28):
     if axis == 'Z':
         M = Matrix.Translation((cx * S_, -cy * S_, (z + h / 2) * S_)) @ Matrix.Rotation(-ang, 4, 'Z') @ Matrix.Diagonal((2 * rx * S_, 2 * ry * S_, h * S_, 1))
     else:  # trục nằm ngang theo y cục bộ (bánh xe), z = tâm
         M = Matrix.Translation((cx * S_, -cy * S_, z * S_)) @ Matrix.Rotation(-ang, 4, 'Z') @ Matrix.Rotation(math.pi / 2, 4, 'X') @ Matrix.Diagonal((2 * rx * S_, 2 * ry * S_, h * S_, 1))
-    n0 = len(bm.faces)
-    bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=.5, radius2=.5, depth=1.0, matrix=M)
-    _mi(bm, n0, mi)
+    res = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=seg, radius1=.5, radius2=.5, depth=1.0, matrix=M)
+    _mi(bm, res, mi)
 
 def add_sph(bm, cx, cy, z, r, mi):
     M = Matrix.Translation((cx * S_, -cy * S_, z * S_)) @ Matrix.Diagonal((2 * r * S_, 2 * r * S_, 2 * r * S_, 1))
-    n0 = len(bm.faces)
-    bmesh.ops.create_uvsphere(bm, u_segments=18, v_segments=10, radius=.5, matrix=M)
-    _mi(bm, n0, mi)
+    res = bmesh.ops.create_uvsphere(bm, u_segments=18, v_segments=10, radius=.5, matrix=M)
+    _mi(bm, res, mi)
 
 # ---------- nội thất 3D (toạ độ cục bộ cm, lưng ở -y) ----------
 def B(x, y, z, w, d, h, m, a=0.0): return ('box', x, y, z, w, d, h, m, a)
@@ -704,6 +710,179 @@ def parts_for(t, w, d, H, seed=1):
     if t == 'bike': return [C(sx * w * .32, 0, 33, 33, 33, 4, 'black', 'Y') for sx in (-1, 1)] + [B(0, 0, 50, w * .55, 4, 4, 'main'), B(w * .05, 0, 60, w * .4, 4, 4, 'main'), B(-w * .18, 0, 85, 24, 10, 5, 'leather'), B(w * .3, 0, 95, 4, d - 4, 3, 'chrome'), B(-w * .18, 0, 33, 4, 4, 52, 'main'), B(w * .3, 0, 33, 4, 4, 62, 'main')]
     if t == 'tank': return [C(0, 0, 0, w / 2, d / 2, 160, 'chrome'), C(0, 0, 160, w * .16, d * .16, 8, 'chrome')]
     if t == 'altar2': return [B(0, 0, 0, w, d, 55, 'main'), B(0, 0, 55, w + 4, d + 4, 3, 'main'), C(0, -d * .1, 58, 7, 7, 7, 'gold'), C(-w * .3, -d * .15, 58, 4, 4, 18, 'white'), C(w * .3, -d * .15, 58, 4, 4, 18, 'white'), SP(0, d * .22, 63, 5, 'fruit')]
+
+    # ---------- xe, garage, sân vườn, hồ bơi, đồ chơi trẻ em ----------
+    r_ = random.Random(seed)
+    if t in ('hatch', 'suv', 'van', 'pickup', 'truck'):
+        wr = 29 if t == 'hatch' else 33
+        ps = [C(sx * w * .31, sy * (d / 2 - 13), wr, wr, wr, 24, 'black', 'Y') for sx in (-1, 1) for sy in (-1, 1)]
+        if t == 'hatch':
+            ps += [B(0, 0, 22, w, d - 8, 46, 'main'), B(-w * .05, 0, 68, w * .5, d * .84, 34, 'tint'), B(-w * .05, 0, 102, w * .43, d * .8, 4, 'main')]
+        elif t == 'suv':
+            ps += [B(0, 0, 28, w, d - 8, 58, 'main'), B(-w * .1, 0, 86, w * .64, d * .86, 44, 'tint'), B(-w * .1, 0, 130, w * .58, d * .82, 4, 'main'), B(-w * .1, d * .4, 134, w * .5, 3, 3, 'chrome'), B(-w * .1, -d * .4, 134, w * .5, 3, 3, 'chrome')]
+        elif t == 'van':
+            ps += [B(0, 0, 28, w, d - 8, 70, 'main'), B(w * .02, 0, 98, w * .86, d * .9, 48, 'tint'), B(w * .02, 0, 146, w * .84, d * .88, 4, 'main')]
+        elif t == 'pickup':
+            ps += [B(w * .18, 0, 28, w * .64, d - 8, 55, 'main'), B(w * .1, 0, 83, w * .3, d * .88, 42, 'tint'), B(w * .1, 0, 125, w * .26, d * .84, 4, 'main'),
+                   B(-w * .28, 0, 28, w * .44, d - 8, 8, 'main'), B(-w * .28, d / 2 - 7, 36, w * .44, 6, 30, 'main'), B(-w * .28, -(d / 2 - 7), 36, w * .44, 6, 30, 'main'), B(-w / 2 + 3, 0, 36, 6, d - 8, 30, 'main')]
+        else:
+            ps += [B(0, 0, 18, w, d * .8, 12, 'dark'), B(w * .32, 0, 28, w * .36, d - 8, 100, 'main'), B(w * .49, 0, 92, 2, d * .84, 32, 'tint'), B(-w * .18, 0, 34, w * .62, d - 8, 150, 'white')]
+        return ps + [B(w / 2 - 1, sy * d * .32, 55, 2, 30, 10, 'lamp') for sy in (-1, 1)] + [B(-w / 2 + 1, sy * d * .32, 55, 2, 24, 8, 'red') for sy in (-1, 1)]
+    if t == 'scooter':
+        return [C(-(w / 2 - 22), 0, 22, 22, 22, 9, 'black', 'Y'), C(w / 2 - 22, 0, 22, 22, 22, 9, 'black', 'Y'), B(-w * .12, 0, 24, w * .5, d * .62, 14, 'main'), B(-w * .18, 0, 40, w * .36, d * .5, 9, 'leather'), B(w * .26, 0, 24, 10, d * .5, 70, 'main'), B(w * .3, 0, 98, 8, d - 6, 4, 'chrome'), SP(w * .34, 0, 82, 7, 'lamp'), B(-w * .36, 0, 46, w * .1, d * .5, 5, 'main')]
+    if t == 'bigbike':
+        return parts_for('moto', w, d, H, seed) + [B(w * .3, 0, 58, w * .12, d * .5, 30, 'main'), B(-w * .08, 0, 75, w * .22, d * .34, 18, 'main'), B(-w * .42, 0, 55, w * .14, d * .4, 12, 'main')]
+    if t == 'carport':
+        ps = [C(sx * (w / 2 - 6), sy * (d / 2 - 6), 0, 5, 5, 250, 'dark') for sx in (-1, 1) for sy in (-1, 1)]
+        return ps + [B(0, 0, 250, w + 20, d + 20, 5, 'glass')] + [B(0, y, 246, w + 20, 6, 5, 'dark') for y in (-d / 2, 0, d / 2)]
+    if t == 'parkslot':
+        return [B(0, 0, 0, w, d, .6, 'stone')] + [B(-w / 2 + 3, 0, .6, 6, d, .4, 'white'), B(w / 2 - 3, 0, .6, 6, d, .4, 'white'), B(0, -d / 2 + 3, .6, w, 6, .4, 'white')]
+    if t == 'motorack':
+        n = max(2, int(round(w / 100)))
+        return [B(0, 0, 0, w, d, 3, 'dark')] + [B(-w / 2 + w * i / n, 0, 3, 3, d, 14, 'metal') for i in range(n + 1)]
+    if t == 'evchg': return [B(0, 0, 70, w, d, 70, 'white'), B(0, d / 2 + .3, 108, w * .5, .5, 14, 'green'), C(w * .25, d / 2 + 2, 85, 2.2, 2.2, 6, 'dark', 'Y')]
+    if t == 'workbench':
+        return legs(w, d, 72, 2.5, 4, 'metal') + [B(0, 0, 72, w, d, 4, 'main'), B(0, -d / 2 + 1.5, 90, w, 2, 90, 'woodl'), B(w * .3, d * .15, 76, 14, 10, 12, 'dark')] + [B(-w / 2 + 25 + i * 22, -d / 2 + 4, 100 + (i % 3) * 22, 3, 3, 14, 'chrome') for i in range(6)]
+    if t == 'toolcab':
+        return [B(0, 0, 0, w, d, 95, 'main'), B(0, 0, 95, w, d, 3, 'dark')] + [B(0, d / 2 + .3, z, w - 4, .7, .7, 'dark') for z in (24, 48, 72)] + [B(0, d / 2 + 1, z + 10, 22, 1.5, 1.5, 'chrome') for z in (0, 24, 48, 72)]
+    if t == 'garshelf':
+        ps = [B(sx * (w / 2 - 2), sy * (d / 2 - 2), 0, 3, 3, 190, 'metal') for sx in (-1, 1) for sy in (-1, 1)]
+        for z in (0, 48, 96, 144, 188): ps.append(B(0, 0, z, w, d, 2.5, 'metal'))
+        for z in (2.5, 50.5, 98.5, 146.5):
+            for k in range(3): ps.append(B(-w / 3 + k * w / 3, 0, z, w * .26, d * .7, 20 + r_.randint(0, 14), ['b1', 'b2', 'b0'][(k + int(z)) % 3]))
+        return ps
+    if t == 'poolL':
+        return [B(0, -d / 4, 0, w, d / 2, 1.2, 'stone'), B(-w * .3, d / 4, 0, w * .4, d / 2, 1.2, 'stone'),
+                B(0, -d / 4, 1.2, w - 28, d / 2 - 28, .5, 'water'), B(-w * .3, (d / 2 - 28) / 2, 1.2, w * .4 - 28, d / 2, .5, 'water')]
+    if t == 'poolRound': return [C(0, 0, 0, w / 2, d / 2, 1.2, 'stone'), C(0, 0, 1.2, w / 2 - 14, d / 2 - 14, .5, 'water')]
+    if t == 'poolKidney':
+        return [C(-w * .2, 0, 0, w * .34, d * .5, 1.2, 'stone'), C(w * .18, d * .1, 0, w * .38, d * .38, 1.25, 'stone'),
+                C(-w * .2, 0, 1.2, w * .34 - 14, d * .5 - 14, .5, 'water'), C(w * .18, d * .1, 1.25, w * .38 - 14, d * .38 - 14, .52, 'water')]
+    if t in ('poolLap', 'poolKid'):
+        ps = [B(0, 0, 0, w, d, 1.2, 'stone'), B(0, 0, 1.2, w - 28, d - 28, .5, 'water')]
+        if t == 'poolLap': ps += [B(0, -d / 2 + 14 + (d - 28) * i / 5, 1.8, w - 80, 1.5, .3, 'white') for i in range(1, 5)]
+        else: ps += [SP(w * .15, 0, 4, 9, 'yellow')]
+        return ps
+    if t == 'jacuzzi': return [B(0, 0, 0, w, d, 40, 'stone'), C(0, 0, 40, w / 2 - 14, d / 2 - 14, .6, 'water')] + [SP(-w * .1 + i * 18, -10 + (i % 2) * 22, 41.4, 3, 'white') for i in range(5)]
+    if t == 'deck': return [B(0, 0, 0, w, d, 7, 'main')] + [B(0, y, 7, w, .8, .3, 'dark') for y in [-d / 2 + 14 + 14 * i for i in range(int(d // 14))] if y < d / 2 - 1]
+    if t == 'lawn': return [B(0, 0, 0, w, d, 2, 'grass')]
+    if t == 'pond': return [C(0, 0, 0, w / 2, d / 2, 8, 'stone'), C(0, 0, 8, w / 2 - 10, d / 2 - 10, .8, 'water'), SP(-w * .38, -d * .2, 6, 9, 'stone'), SP(w * .4, d * .1, 6, 11, 'stone'), SP(-w * .2, d * .38, 5, 8, 'stone')]
+    if t == 'fountain': return [C(0, 0, 0, r, r, 22, 'stone'), C(0, 0, 22, r - 8, r - 8, .8, 'water'), C(0, 0, 0, r * .3, r * .3, 70, 'stone'), C(0, 0, 70, r * .5, r * .5, 6, 'stone'), SP(0, 0, 84, 6, 'water')]
+    if t == 'lounger':
+        ps = [B(sx * (w / 2 - 4), sy * (d / 2 - 8), 0, 3, 4, 24, 'metal') for sx in (-1, 1) for sy in (-1, 1)] + [B(0, d * .1, 24, w, d * .62, 6, 'main')]
+        for i in range(4): ps.append(B(0, -d / 2 + 8 + i * 11, 24 + (3 - i) * 7 + 6, w, 12, 5, 'main'))
+        return ps
+    if t == 'lounger2':
+        lw = w * .4
+        return [(p[0], p[1] + sx * (w / 2 - lw / 2),) + p[2:] if p[0] in ('box', 'cyl', 'sph') else p for sx in (-1, 1) for p in parts_for('lounger', lw, d, H, seed)] + [C(0, -d * .05, 0, w * .09, w * .09, 45, 'woodl')]
+    if t == 'parasol':
+        ps = [C(0, 0, 0, 14, 14, 3, 'dark'), C(0, 0, 3, 2, 2, 230, 'metal')]
+        for i in range(6): ps.append(C(0, 0, 195 + i * 7, r * (1 - i * .15), r * (1 - i * .15), 7, 'main' if i % 2 == 0 else 'white'))
+        return ps
+    if t == 'patio':
+        return [C(0, 0, 0, 3, 3, 70, 'dark'), C(0, 0, 70, r * .45, r * .45, 3, 'main')] + [p for k in range(4) for p in chair(math.cos(k * math.pi / 2) * r * .72, math.sin(k * math.pi / 2) * r * .72, k * math.pi / 2 + math.pi / 2, 42, 42, 'wood')]
+    if t == 'gbench':
+        return legs(w, d, 42, 2.5, 5, 'metal') + [B(0, 0, 42, w, d, 4, 'main'), B(0, -d / 2 + 3, 46, w, 3, 40, 'main')]
+    if t == 'bbq':
+        return [B(0, 0, 0, w, d, 85, 'stone'), B(0, 0, 85, w, d, 4, 'dark'), B(-w * .2, 0, 89, w * .4, d - 12, 8, 'dark'), B(-w * .2, -d / 2 + 5, 97, w * .4, 4, 30, 'metal'), C(w * .3, 0, 85, w * .12, w * .12, 3, 'metal'), B(w * .3, d / 2 + .3, 50, w * .26, .8, 22, 'dark')]
+    if t == 'outshower': return [B(0, 0, 0, w, d, 3, 'stone'), C(0, 0, 3, 2.5, 2.5, 210, 'chrome'), C(0, 0, 211, 10, 10, 2, 'chrome'), B(w * .2, 0, 120, 10, 2, 2, 'chrome')]
+    if t == 'pergola':
+        ps = [B(sx * (w / 2 - 8), sy * (d / 2 - 8), 0, 12, 12, 250, 'main') for sx in (-1, 1) for sy in (-1, 1)]
+        ps += [B(0, sy * (d / 2 - 8), 250, w, 10, 14, 'main') for sy in (-1, 1)]
+        return ps + [B(x, 0, 264, 6, d + 14, 6, 'main') for x in [-w / 2 + 12 + 22 * i for i in range(int((w - 12) // 22))]]
+    if t == 'gazebo':
+        ps = [B(0, 0, 0, w * .9, w * .9, 12, 'wood')]
+        for i in range(8):
+            a = i * math.pi / 4 + math.pi / 8
+            ps.append(C(math.cos(a) * r * .86, math.sin(a) * r * .86, 12, 4, 4, 230, 'wood'))
+        for i in range(7): ps.append(C(0, 0, 242 + i * 9, r * (1.02 - i * .15), r * (1.02 - i * .15), 9, 'roofred'))
+        return ps
+    if t == 'tree':
+        return [C(0, 0, 0, 12, 12, 190, 'trunk')] + [SP(math.cos(i * 2.1) * r * .45, math.sin(i * 2.1) * r * .45, 250 + (i % 3) * 25, r * .55, 'leaf') for i in range(5)] + [SP(0, 0, 300, r * .6, 'leaf')]
+    if t == 'palm':
+        ps = [C(0, 0, 0, 9, 9, 280, 'trunk')]
+        for i in range(9):
+            a = i * 2 * math.pi / 9
+            ps.append(B(math.cos(a) * r * .4, math.sin(a) * r * .4, 270 - (i % 2) * 14, r * .9, 14, 3, 'leaf', a))
+        return ps + [SP(0, 0, 285, 14, 'trunk')]
+    if t == 'bush': return [SP(-.35 * r, -.2 * r, r * .5, r * .55, 'leaf'), SP(.3 * r, -.25 * r, r * .45, r * .5, 'leaf'), SP(.05 * r, .3 * r, r * .5, r * .58, 'leaf'), SP(0, 0, r * .75, r * .5, 'leaf')]
+    if t == 'flowerbed':
+        ps = [B(0, 0, 0, w, d, 14, 'soil')] + [SP(-w / 2 + 9 + i * 9, (i % 3 - 1) * d * .22, 18, 4.5, ['pink', 'yellow', 'white', 'red', 'b1'][i % 5]) for i in range(int(w // 9))]
+        return ps
+    if t == 'lampg': return [C(0, 0, 0, 5, 5, 3, 'dark'), C(0, 0, 3, 1.5, 1.5, 60, 'dark'), SP(0, 0, 70, 9, 'lamp')]
+    if t == 'stepping':
+        n = max(3, int(round(w / 40)))
+        return [C(-w / 2 + (i + .5) * w / n, (1 if i % 2 else -1) * d * .12, 0, w / n * .42, d * .32, 3, 'stone') for i in range(n)]
+    if t in ('slide', 'playhouse'):
+        sx0 = -w / 2; ps = []
+        if t == 'slide':
+            pw = min(w * .3, 90); top = 110
+            ps += [C(sx0 + 20, sy, 0, 3, 3, top, 'metal') for sy in (-d / 2 + 6, d / 2 - 6)] + [C(sx0 + pw - 4, sy, 0, 3, 3, top, 'metal') for sy in (-d / 2 + 6, d / 2 - 6)]
+            ps += [B(sx0 + 20 + (pw - 24) / 2, 0, top, pw - 20, d - 6, 4, 'main')]
+            ps += [B(sx0 + 9, 0, 14 + 18 * i, 4, d * .6, 3, 'dark') for i in range(5)]
+            x0 = sx0 + pw - 2
+        else:
+            hs = min(d - 20, w * .45); top = 110
+            ps += [B(sx0 + hs / 2, 0, 0, hs, hs, top, 'main'), B(sx0 + hs / 2, 0, top, hs + 8, hs + 8, 5, 'dark')]
+            for i in range(5): ps.append(B(sx0 + hs / 2, 0, top + 5 + i * 11, (hs + 8) * (1 - i * .2), (hs + 8) * (1 - i * .2), 11, 'roofred'))
+            ps += [B(sx0 + hs / 2, hs / 2 + .3, 0, hs * .3, .8, 62, 'dark')]
+            x0 = sx0 + hs
+        L = sx0 + w - x0; n = 12
+        for i in range(n):
+            x = x0 + (i + .5) * L / n; z = 108 - i * (92 / n)
+            ps += [B(x, 0, z, L / n + 1.2, 48, 3, 'yellow'), B(x, 27, z, L / n + 1.2, 3, 12, 'yellow'), B(x, -27, z, L / n + 1.2, 3, 12, 'yellow')]
+        return ps
+    if t == 'swing':
+        ps = []
+        for ex in (-1, 1):
+            for sy in (-1, 1): ps.append(C(ex * w / 2, sy * d * .42, 0, 3.5, 3.5, 215, 'blue'))
+        ps.append(B(0, 0, 212, w + 8, 7, 7, 'blue'))
+        for x in (-w * .2, w * .2):
+            ps += [C(x - 14, 0, 55, 1, 1, 157, 'dark'), C(x + 14, 0, 55, 1, 1, 157, 'dark'), B(x, 0, 48, 38, 16, 4, 'pink')]
+        return ps
+    if t == 'seesaw':
+        return [B(0, 0, 0, 14, d - 6, 30, 'dark')] + [B(-w / 2 + (i + .5) * w / 10, 0, 22 + (4.5 - i) * 4, w / 10 + .5, d * .7, 5, 'main') for i in range(10)] + [B(-w / 2 + 14, 0, 40, 4, d * .5, 20, 'dark'), B(w / 2 - 14, 0, 14, 4, d * .5, 20, 'dark')]
+    if t == 'sandbox':
+        return [B(0, -d / 2 + 4, 0, w, 8, 26, 'wood'), B(0, d / 2 - 4, 0, w, 8, 26, 'wood'), B(-w / 2 + 4, 0, 0, 8, d - 16, 26, 'wood'), B(w / 2 - 4, 0, 0, 8, d - 16, 26, 'wood'), B(0, 0, 0, w - 16, d - 16, 20, 'sand'), C(-w * .15, -d * .1, 20, 9, 9, 12, 'red'), C(w * .18, d * .15, 20, 6, 6, 8, 'blue')]
+    if t == 'trampoline':
+        ps = [C(math.cos(i * math.pi / 3) * (r - 10), math.sin(i * math.pi / 3) * (r - 10), 0, 2.5, 2.5, 70, 'metal') for i in range(6)]
+        ps += [C(0, 0, 70, r, r, 6, 'blue'), C(0, 0, 76, r - 14, r - 14, 1.5, 'black')]
+        return ps + [C(math.cos(i * math.pi / 4) * (r - 3), math.sin(i * math.pi / 4) * (r - 3), 76, 1.6, 1.6, 170, 'dark') for i in range(8)]
+    if t == 'climb':
+        ps = [B(sx * (w / 2 - 4), sy * (d / 2 - 4), 0, 7, 7, 220, 'main') for sx in (-1, 1) for sy in (-1, 1)]
+        ps += [B(-w * .3, -d * .3, 110, w * .4, d * .4, 4, 'wood')] + [B(sx * (w / 2 - 4), 0, 215, 6, d, 6, 'main') for sx in (-1, 1)] + [B(0, sy * (d / 2 - 4), 215, w, 6, 6, 'main') for sy in (-1, 1)]
+        ps += [B(x, 0, 190, 3, d - 10, 3, 'dark') for x in [w * .02 + i * 18 for i in range(int((w / 2 - 12) // 18))]]
+        ps += [B(-w / 2 + 3, -d * .3, 12 + i * 20, 4, d * .3, 3, 'dark') for i in range(5)]
+        return ps
+    if t == 'springrider':
+        return [C(0, 0, 0, 6, 6, 28, 'metal'), B(0, 0, 28, w * .9, d * .5, 22, 'main'), SP(0, -d * .36, 66, w * .3, 'main'), SP(-w * .18, -d * .46, 90, w * .1, 'main'), SP(w * .18, -d * .46, 90, w * .1, 'main'), B(0, d * .3, 50, w * .5, d * .2, 6, 'main')]
+    if t == 'merry':
+        ps = [C(0, 0, 0, 9, 9, 22, 'dark'), C(0, 0, 22, r, r, 5, 'pink'), C(0, 0, 27, r * .9, r * .9, 1, 'yellow')]
+        for i in range(4):
+            a = i * math.pi / 2 + math.pi / 4
+            ps += [C(math.cos(a) * r * .75, math.sin(a) * r * .75, 27, 1.8, 1.8, 50, 'metal')]
+        return ps + [C(0, 0, 27, 3, 3, 62, 'metal')]
+    if t == 'ballpit':
+        ps = [B(0, -d / 2 + 4, 0, w, 8, 45, 'main'), B(0, d / 2 - 4, 0, w, 8, 45, 'main'), B(-w / 2 + 4, 0, 0, 8, d - 16, 45, 'main'), B(w / 2 - 4, 0, 0, 8, d - 16, 45, 'main')]
+        for i in range(34): ps.append(SP(-w / 2 + 18 + r_.random() * (w - 36), -d / 2 + 18 + r_.random() * (d - 36), 10 + r_.random() * 14, 8, ['pink', 'blue', 'yellow', 'green', 'white'][i % 5]))
+        return ps
+    if t == 'hoop':
+        ps = [B(0, d / 2 - 15, 0, w * .4, 22, 10, 'dark'), C(0, d / 2 - 15, 10, 4, 4, 250, 'metal'), B(0, -d / 2 + 5, 240, w * .7, 4, 55, 'white')]
+        ps += [SP(math.cos(i * math.pi / 4) * 22, -d * .18 + math.sin(i * math.pi / 4) * 22, 242, 2, 'red') for i in range(8)]
+        return ps + [B(0, -d / 2 + 18, 242, 4, d * .55, 3, 'red')]
+    if t == 'goal':
+        return [B(sx * (w / 2 - 2), 0, 0, 4, 4, 90, 'white') for sx in (-1, 1)] + [B(0, 0, 88, w, 4, 4, 'white'), B(0, d / 2 - 2, 0, w, 2, 90, 'glass'), B(0, 0, 90, w, d, 1, 'glass')]
+    if t == 'tent':
+        return [C(0, 0, i * 12, r * (1 - i * .09), r * (1 - i * .09), 12, 'main') for i in range(10)] + [B(r * .55, 0, 0, 3, r * .45, r * .85, 'dark')]
+    if t == 'playmat':
+        n = max(2, int(round(w / 50))); m = max(2, int(round(d / 50)))
+        return [B(-w / 2 + (i + .5) * w / n, -d / 2 + (j + .5) * d / m, 0, w / n - .6, d / m - .6, 2, ['pink', 'blue', 'yellow', 'green'][(i + j * 2) % 4]) for i in range(n) for j in range(m)]
+    if t == 'inflatable':
+        ps = [C(0, 0, 0, r - 10, r - 10, 22, 'water')]
+        for i in range(14):
+            a = i * 2 * math.pi / 14
+            ps.append(SP(math.cos(a) * (r - 14), math.sin(a) * (r - 14), 18, 15, 'main'))
+        return ps
     return [B(0, 0, 0, w, d, 60, 'main')]
 
 def _img_mat(uid, dataurl):
@@ -1725,6 +1904,129 @@ Object.assign(FURN,{
  altar2:{n:'Bàn thờ Thần Tài',c:'other',w:61,d:48,col:'#a0522d',dr:'altar',wall:1},
 });
 Object.assign(ALIAS,{bunk_bed:'bunk',shoe_cabinet:'shoe',upper_cabinet:'upper',wall_cabinet:'upper',water_heater:'heater',double_basin:'basin2',dishwasher:'dish',bar_counter:'bar',display_cabinet:'display',wine_cabinet:'wine',treadmill:'tread',standing_fan:'fan',fan:'fan',water_purifier:'purifier',bicycle:'bike',water_tank:'tank',hammock:'hammock',dining_table_8:'dining8',billiard_table:'billiard',study_desk:'kidsdesk',standing_mirror:'mirror'});
+/* ================= XE, GARAGE, SÂN VƯỜN, HỒ BƠI, ĐỒ CHƠI TRẺ EM ================= */
+(function(){
+const GL='#a9cfe3',WT='#7fc8e8',GR='#6fae55',SAND='#e6d29c',STN='#eceae4';
+function pl(c,a){c.beginPath();a.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath()}
+function poolRect(c,w,d,col,lanes){rr(c,-w/2,-d/2,w,d,8);fs(c,STN);rr(c,-w/2+14,-d/2+14,w-28,d-28,6);fs(c,col,'#5c8aa3');if(lanes){const n=Math.max(2,lanes);c.save();c.strokeStyle='rgba(30,90,130,.55)';for(let i=1;i<n;i++){const y=-d/2+14+(d-28)*i/n;ln(c,-w/2+40,y,w/2-40,y)}c.restore()}}
+Object.assign(DR,{
+ veh(c,w,d,col,F){const k=F.kind||'sedan',tw=d*.11,wl=w*.17;
+  const K={sedan:[.2,.1,-.14,-.27],hatch:[.17,.07,-.2,-.3],suv:[.2,.1,-.3,-.4],van:[.3,.2,-.4,-.47],pickup:[.14,.04,-.1,-.17],truck:[.46,.36,.2,.14]}[k]||[.2,.1,-.14,-.27];
+  for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*w*.3-wl/2,sy*(d/2-tw/2)-tw/2,wl,tw,3);fs(c,'#2b2d31')}
+  if(k==='truck'){rr(c,-w/2,-d*.46,w*.62,d*.92,4);fs(c,'#e8ecef');for(let x=-w/2+20;x<w*.1;x+=22)ln(c,x,-d*.42,x,d*.42);rr(c,w*.12,-d/2+tw*.5,w*.38,d-tw,d*.18);fs(c,col)}
+  else{rr(c,-w/2,-d/2+tw*.5,w,d-tw,d*.2);fs(c,col)}
+  const a=K[0]*w,b=K[1]*w,c2=K[2]*w,e=K[3]*w;
+  rr(c,b,-d*.34,a-b,d*.68,4);fs(c,GL);rr(c,c2,-d*.31,b-c2,d*.62,5);fs(c,sh(col,.14));rr(c,e,-d*.29,c2-e,d*.58,4);fs(c,GL);
+  if(k==='pickup'){rr(c,-w/2+5,-d*.38,e-3-(-w/2+5),d*.76,3);fs(c,sh(col,-.4));rr(c,-w/2+10,-d*.32,e-3-(-w/2+15),d*.64,2);fs(c,null)}
+  for(const sy of[-1,1]){rr(c,w/2-5,sy*d*.34-d*.07,4,d*.14,1);fs(c,'#fff3b0',0);rr(c,-w/2+1,sy*d*.34-d*.07,3,d*.14,1);fs(c,'#d33',0);circ(c,a,sy*(d/2-tw*.2),3);fs(c,sh(col,-.3))}},
+ carport(c,w,d,col){c.save();c.globalAlpha=.35;rr(c,-w/2,-d/2,w,d,2);fs(c,col,0);c.restore();c.setLineDash([8,5]);rr(c,-w/2,-d/2,w,d,2);fs(c,null);c.setLineDash([]);for(let x=-w/2+w/6;x<w/2;x+=w/6)ln(c,x,-d/2,x,d/2);for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-5)-5,sy*(d/2-5)-5,10,10,1);fs(c,'#3a3e43')}},
+ evchg(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);c.fillStyle='#2e9d4f';c.font=`700 ${Math.min(w,d)*.8}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('⚡',0,1)},
+ rack(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);const n=Math.max(2,Math.round(w/100));for(let i=0;i<=n;i++)ln(c,-w/2+w*i/n,-d/2,-w/2+w*i/n,d/2);for(let i=0;i<n;i++){const x=-w/2+w*(i+.5)/n;rr(c,x-4,-d*.38,8,d*.76,3);fs(c,'#8a8f96',0)}},
+ workbench(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);rr(c,-w/2,-d/2,w,8,1);fs(c,sh(col,-.25));rr(c,w/2-30,d/2-22,20,14,2);fs(c,'#555');ln(c,-w/2+10,0,w/2-40,0)},
+ toolcab(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);ln(c,-w/2,d/2-9,w/2,d/2-9);for(let i=1;i<4;i++)ln(c,-w/2+w*i/4,-d/2,-w/2+w*i/4,d/2-9)},
+ garshelf(c,w,d,col){rr(c,-w/2,-d/2,w,d,1);fs(c,col);const n=Math.max(2,Math.round(w/40));for(let i=0;i<n;i++){rr(c,-w/2+4+i*(w-8)/n,-d/2+5,(w-8)/n-4,d-10,2);fs(c,i%2?'#d8b25a':'#8e9aa6',0)}},
+ parkslot(c,w,d,col){c.save();c.strokeStyle='#8a8f96';c.lineWidth*=2.4;c.beginPath();c.moveTo(-w/2,d/2);c.lineTo(-w/2,-d/2);c.lineTo(w/2,-d/2);c.lineTo(w/2,d/2);c.stroke();c.restore();c.fillStyle='#8a8f96';c.font=`700 ${Math.min(w,d)*.35}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('P',0,0)},
+ poolL(c,w,d,col){const o=[[-w/2,-d/2],[w/2,-d/2],[w/2,0],[-w*.1,0],[-w*.1,d/2],[-w/2,d/2]],i=[[-w/2+14,-d/2+14],[w/2-14,-d/2+14],[w/2-14,-14],[-w*.1-14,-14],[-w*.1-14,d/2-14],[-w/2+14,d/2-14]];pl(c,o);fs(c,STN);pl(c,i);fs(c,col,'#5c8aa3')},
+ poolRound(c,w,d,col){ell(c,0,0,w/2,d/2);fs(c,STN);ell(c,0,0,w/2-14,d/2-14);fs(c,col,'#5c8aa3')},
+ poolKidney(c,w,d,col){for(const [x,y,rx,ry,m] of [[-w*.2,0,w*.34,d*.5,0],[w*.18,d*.1,w*.38,d*.38,0]]){ell(c,x,y,rx,ry);fs(c,STN,0)}for(const [x,y,rx,ry] of [[-w*.2,0,w*.34,d*.5],[w*.18,d*.1,w*.38,d*.38]]){ell(c,x,y,rx-14,ry-14);fs(c,col,0)}},
+ poolLap(c,w,d,col){poolRect(c,w,d,col,5)},
+ poolKid(c,w,d,col){poolRect(c,w,d,col,0);circ(c,w*.15,0,Math.min(w,d)*.07);fs(c,'#ffd84d')},
+ jacuzzi(c,w,d,col){rr(c,-w/2,-d/2,w,d,Math.min(w,d)*.3);fs(c,'#cfc6b6');circ(c,0,0,Math.min(w,d)/2-14);fs(c,col,'#5c8aa3');for(let i=0;i<9;i++){const a=i*.7;circ(c,Math.cos(a)*i*5,Math.sin(a)*i*5,2.2+i*.15);fs(c,'rgba(255,255,255,.7)',0)}},
+ deck(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);for(let y=-d/2+14;y<d/2-2;y+=14)ln(c,-w/2,y,w/2,y)},
+ lawn(c,w,d,col){rr(c,-w/2,-d/2,w,d,10);fs(c,col);c.save();c.strokeStyle=sh(col,-.25);for(let i=0;i<Math.round(w*d/1800);i++){const x=((i*73)%100)/100*(w-30)-w/2+15,y=((i*47+13)%100)/100*(d-30)-d/2+15;ln(c,x,y,x-2,y-5);ln(c,x,y,x+2,y-5)}c.restore()},
+ pond(c,w,d,col){ell(c,0,0,w/2,d/2);fs(c,'#b6aa94');ell(c,0,0,w/2-10,d/2-10);fs(c,col,'#5c8aa3');for(const [x,y,r] of [[-w*.38,-d*.2,9],[w*.4,d*.1,11],[-w*.2,d*.38,8],[w*.2,-d*.4,7]]){circ(c,x,y,r);fs(c,'#8f8a80')}circ(c,w*.12,d*.05,7);fs(c,'#f08a5d')},
+ fountain(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'#cfc6b6');circ(c,0,0,r-8);fs(c,col,'#5c8aa3');circ(c,0,0,r*.3);fs(c,'#cfc6b6');circ(c,0,0,r*.1);fs(c,'#fff')},
+ lounger(c,w,d,col){rr(c,-w/2,-d/2,w,d,8);fs(c,col);rr(c,-w/2+4,-d/2+4,w-8,d*.3,6);fs(c,sh(col,-.15));rr(c,-w/2+8,-d/2+9,w-16,18,6);fs(c,'#fff');ln(c,-w/2+4,-d/2+4+d*.3,w/2-4,-d/2+4+d*.3)},
+ lounger2(c,w,d,col){const lw=w*.4;for(const s of[-1,1]){c.save();c.translate(s*(w/2-lw/2),0);DR.lounger(c,lw,d,col);c.restore()}circ(c,0,-d*.05,w*.09);fs(c,'#d9c7a3')},
+ parasol(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'#fff');for(let i=0;i<8;i+=2){c.beginPath();c.moveTo(0,0);c.arc(0,0,r,i*PI/4,(i+1)*PI/4);c.closePath();fs(c,col,0)}circ(c,0,0,r);fs(c,null);circ(c,0,0,3);fs(c,'#555')},
+ gbench(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);rr(c,-w/2,-d/2,w,d*.28,2);fs(c,sh(col,-.2));for(let i=1;i<4;i++)ln(c,-w/2+3,-d/2+d*.28+(d*.72)*i/4,w/2-3,-d/2+d*.28+(d*.72)*i/4)},
+ bbq(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);rr(c,-w*.4,-d*.38,w*.4,d*.76,2);fs(c,'#3a3e43');for(let x=-w*.37;x<-w*.02;x+=7)ln(c,x,-d*.34,x,d*.34);circ(c,w*.25,0,d*.2);fs(c,'#fff');rr(c,w*.1,-d/2+3,w*.3,5,1);fs(c,'#999',0)},
+ outshower(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);circ(c,0,0,w*.22);fs(c,'#bfc5cb');circ(c,0,0,w*.08);fs(c,'#555');for(let i=0;i<8;i++){const a=i*PI/4;ln(c,Math.cos(a)*w*.28,Math.sin(a)*w*.28,Math.cos(a)*w*.4,Math.sin(a)*w*.4)}},
+ pergola(c,w,d,col){c.setLineDash([8,5]);rr(c,-w/2,-d/2,w,d,2);fs(c,null);c.setLineDash([]);for(let x=-w/2+12;x<w/2;x+=22){rr(c,x-3,-d/2-4,6,d+8,1);fs(c,col)}for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-8)-6,sy*(d/2-8)-6,12,12,1);fs(c,sh(col,-.4))}},
+ gazebo(c,w,d,col){const r=Math.min(w,d)/2,P=[];for(let i=0;i<8;i++)P.push([Math.cos(i*PI/4+PI/8)*r,Math.sin(i*PI/4+PI/8)*r]);pl(c,P);fs(c,col);for(const p of P)ln(c,0,0,p[0],p[1]);circ(c,0,0,5);fs(c,sh(col,-.4));for(const p of P){circ(c,p[0]*.94,p[1]*.94,5);fs(c,'#3a3e43')}},
+ tree(c,w,d,col){const r=Math.min(w,d)/2;for(let i=0;i<9;i++){const a=i*2*PI/9;circ(c,Math.cos(a)*r*.55,Math.sin(a)*r*.55,r*.46);fs(c,sh(col,i%2?.05:-.05),sh(col,-.4))}circ(c,0,0,r*.6);fs(c,col,sh(col,-.4));circ(c,0,0,r*.09);fs(c,'#7a5230')},
+ palm(c,w,d,col){const r=Math.min(w,d)/2;for(let i=0;i<9;i++){c.save();c.rotate(i*2*PI/9);ell(c,r*.5,0,r*.5,r*.11);fs(c,col,sh(col,-.4));ln(c,0,0,r,0);c.restore()}circ(c,0,0,r*.1);fs(c,'#7a5230')},
+ bush(c,w,d,col){const r=Math.min(w,d)/2;for(const [x,y,k] of [[-.35,-.2,.55],[.3,-.25,.5],[.05,.3,.58],[-.2,.15,.45],[.3,.2,.4]]){circ(c,x*r,y*r,k*r);fs(c,sh(col,k>.5?0:.08),sh(col,-.4))}},
+ flowerbed(c,w,d,col){rr(c,-w/2,-d/2,w,d,8);fs(c,'#7a5a3a');const cs=['#e8648a','#f2c230','#fff','#d0482c','#8e6ad8'];for(let i=0;i<Math.round(w/9);i++){circ(c,-w/2+9+i*9,(i%3-1)*d*.22,4.2);fs(c,cs[i%5],sh(cs[i%5],-.4))}},
+ lampg(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'rgba(255,240,200,.55)');circ(c,0,0,r*.4);fs(c,col)},
+ stepping(c,w,d,col){const n=Math.max(3,Math.round(w/40));for(let i=0;i<n;i++){ell(c,-w/2+(i+.5)*w/n,(i%2?1:-1)*d*.12,w/n*.42,d*.32);fs(c,col)}},
+ slide(c,w,d,col){const pw=Math.min(w*.3,90);rr(c,-w/2,-d/2,pw,d,3);fs(c,'#f1f1ef');for(let y=-d/2+8;y<d/2-4;y+=12)ln(c,-w/2+2,y,-w/2+16,y);rr(c,-w/2+18,-d/2+4,pw-22,d-8,3);fs(c,col);rr(c,-w/2+pw,-d*.3,w-pw,d*.6,d*.18);fs(c,'#ffd84d');ln(c,-w/2+pw,-d*.2,w/2-8,-d*.2);ln(c,-w/2+pw,d*.2,w/2-8,d*.2)},
+ playhouse(c,w,d,col){const hs=Math.min(d,w*.5);rr(c,-w/2,-hs/2,hs,hs,3);fs(c,col);pl(c,[[-w/2,-hs/2],[-w/2+hs,-hs/2],[-w/2+hs/2,0]]);fs(c,'#d0482c');pl(c,[[-w/2,hs/2],[-w/2+hs,hs/2],[-w/2+hs/2,0]]);fs(c,'#b9381f');ln(c,-w/2,-hs/2,-w/2+hs,hs/2);ln(c,-w/2+hs,-hs/2,-w/2,hs/2);rr(c,-w/2+hs,-d*.3,w-hs,d*.6,d*.18);fs(c,'#ffd84d');ln(c,-w/2+hs,-d*.2,w/2-8,-d*.2);ln(c,-w/2+hs,d*.2,w/2-8,d*.2)},
+ swing(c,w,d,col){for(const sx of[-1,1]){ln(c,sx*w/2,-d/2,sx*w/2,d/2);ln(c,sx*w/2,-d/2,sx*w/2,-d/2);}rr(c,-w/2-3,-3,w+6,6,2);fs(c,col);for(const sx of[-1,1]){rr(c,sx*w/2-4,-d/2-3,8,6,1);fs(c,'#555');rr(c,sx*w/2-4,d/2-3,8,6,1);fs(c,'#555')}for(const x of[-w*.2,w*.2]){rr(c,x-18,-9,36,18,4);fs(c,'#e8648a');}},
+ seesaw(c,w,d,col){rr(c,-w/2,-d/2,w,d,d*.4);fs(c,col);rr(c,-8,-d/2-3,16,d+6,3);fs(c,'#555');for(const s of[-1,1]){rr(c,s*(w/2-22)-3,-d/2+3,6,d-6,2);fs(c,'#333',0)}},
+ sandbox(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);rr(c,-w/2+10,-d/2+10,w-20,d-20,3);fs(c,SAND);circ(c,-w*.15,-d*.1,9);fs(c,'#d0482c');circ(c,w*.18,d*.15,6);fs(c,'#2f7de1');rr(c,w*.05,-d*.25,16,10,2);fs(c,'#f2c230')},
+ trampoline(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,col);circ(c,0,0,r-14);fs(c,'#2b2d31');circ(c,0,0,r-14);c.save();c.strokeStyle='#9aa3ac';for(let i=0;i<24;i++){const a=i*PI/12;ln(c,Math.cos(a)*(r-14),Math.sin(a)*(r-14),Math.cos(a)*(r-3),Math.sin(a)*(r-3))}c.restore();for(let i=0;i<8;i++){const a=i*PI/4;circ(c,Math.cos(a)*(r+2),Math.sin(a)*(r+2),3);fs(c,'#333')}},
+ climb(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,'rgba(255,255,255,.4)');for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-4)-4,sy*(d/2-4)-4,8,8,1);fs(c,col)}rr(c,-w/2+10,-d/2+10,w*.4,d*.4,2);fs(c,'#d8c3a2');for(let x=w*.0;x<w/2-12;x+=14)ln(c,x,-d/2+10,x,-d/2+d*.4+10);for(let y=d*.1;y<d/2-10;y+=14)ln(c,w*.05,y,w/2-10,y)},
+ springrider(c,w,d,col){ell(c,0,0,w*.45,d*.34);fs(c,col);circ(c,0,-d*.36,w*.28);fs(c,sh(col,.1));circ(c,0,d*.12,w*.18);fs(c,'#8a8f96');ln(c,-w*.4,-d*.05,w*.4,-d*.05)},
+ merry(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'#f4f4f2');for(let i=0;i<4;i++){c.beginPath();c.moveTo(0,0);c.arc(0,0,r-4,i*PI/2,(i+1)*PI/2);c.closePath();fs(c,['#e8648a','#2f7de1','#f2c230','#3d9a55'][i],0)}circ(c,0,0,r);fs(c,null);circ(c,0,0,r*.12);fs(c,'#555')},
+ ballpit(c,w,d,col){rr(c,-w/2,-d/2,w,d,10);fs(c,col);const cs=['#e8648a','#2f7de1','#f2c230','#3d9a55','#fff'];let k=0;for(let y=-d/2+18;y<d/2-10;y+=14)for(let x=-w/2+18+(k%2)*7;x<w/2-10;x+=14){circ(c,x,y,6);fs(c,cs[(k++*7)%5],sh(cs[(k*3)%5],-.4))}},
+ hoop(c,w,d,col){rr(c,-w*.2,d/2-26,w*.4,22,2);fs(c,'#555');ln(c,0,d/2-15,0,-d*.2);rr(c,-w*.35,-d/2,w*.7,6,1);fs(c,'#fff');ln(c,0,-d*.2,0,-d/2+6);circ(c,0,-d*.18,d*.13);fs(c,null);c.strokeStyle='#d0482c'},
+ goal(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,'rgba(255,255,255,.5)');c.save();c.strokeStyle='#bbb';for(let x=-w/2+10;x<w/2;x+=10)ln(c,x,-d/2,x,d/2);for(let y=-d/2+10;y<d/2;y+=10)ln(c,-w/2,y,w/2,y);c.restore();rr(c,-w/2,-d/2,w,5,1);fs(c,col)},
+ tent(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,col);for(let i=0;i<6;i++){const a=i*PI/3;ln(c,0,0,Math.cos(a)*r,Math.sin(a)*r)}pl(c,[[r*.2,-r*.18],[r,-r*.3],[r,r*.3],[r*.2,r*.18]]);fs(c,sh(col,-.35));circ(c,0,0,4);fs(c,'#555')},
+ playmat(c,w,d,col){const n=Math.max(2,Math.round(w/50)),m=Math.max(2,Math.round(d/50)),cs=['#e8648a','#2f7de1','#f2c230','#3d9a55'];for(let i=0;i<n;i++)for(let j=0;j<m;j++){rr(c,-w/2+i*w/n,-d/2+j*d/m,w/n,d/m,2);fs(c,cs[(i+j*2)%4])}},
+ inflatable(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,col);circ(c,0,0,r-16);fs(c,WT,sh(col,-.3));c.save();c.strokeStyle='#fff';c.globalAlpha=.6;circ(c,0,0,r-8);c.stroke();c.restore()},
+});
+Object.assign(FURN,{
+ hatch:{n:'Ô tô nhỏ (hatchback)',c:'vehicle',w:390,d:170,col:'#d9534f',dr:'veh',kind:'hatch'},
+ suv:{n:'SUV / 7 chỗ',c:'vehicle',w:480,d:190,col:'#4b5563',dr:'veh',kind:'suv'},
+ van:{n:'Xe van / MPV',c:'vehicle',w:510,d:190,col:'#e5e7eb',dr:'veh',kind:'van'},
+ pickup:{n:'Xe bán tải',c:'vehicle',w:540,d:195,col:'#3b6ea8',dr:'veh',kind:'pickup'},
+ truck:{n:'Xe tải nhỏ',c:'vehicle',w:600,d:210,col:'#f2f2f0',dr:'veh',kind:'truck'},
+ scooter:{n:'Xe ga',c:'vehicle',w:175,d:65,col:'#2f7de1',dr:'moto'},
+ bigbike:{n:'Xe phân khối lớn',c:'vehicle',w:215,d:80,col:'#22262b',dr:'moto'},
+ carport:{n:'Mái che xe',c:'vehicle',w:300,d:550,col:'#cfd8dc',dr:'carport'},
+ parkslot:{n:'Ô đỗ xe (vạch)',c:'vehicle',w:250,d:500,col:'#8a8f96',dr:'parkslot'},
+ motorack:{n:'Giá để xe máy (4 chỗ)',c:'vehicle',w:400,d:80,col:'#e4e6e8',dr:'rack'},
+ evchg:{n:'Trạm sạc xe điện',c:'vehicle',w:30,d:16,col:'#f4f6f8',dr:'evchg',wall:1},
+ workbench:{n:'Bàn dụng cụ',c:'vehicle',w:180,d:60,col:'#d8c3a2',dr:'workbench',wall:1},
+ toolcab:{n:'Tủ đồ nghề',c:'vehicle',w:80,d:50,col:'#c0392b',dr:'toolcab',wall:1},
+ garshelf:{n:'Kệ sắt kho',c:'vehicle',w:150,d:45,col:'#9aa3ac',dr:'garshelf',wall:1},
+ poolL:{n:'Hồ bơi chữ L',c:'outdoor',w:700,d:400,col:WT,dr:'poolL'},
+ poolRound:{n:'Hồ bơi tròn',c:'outdoor',w:400,d:400,col:WT,dr:'poolRound'},
+ poolKidney:{n:'Hồ bơi hình thận',c:'outdoor',w:700,d:380,col:WT,dr:'poolKidney'},
+ poolLap:{n:'Hồ bơi dài (5 làn)',c:'outdoor',w:1000,d:250,col:WT,dr:'poolLap'},
+ poolKid:{n:'Hồ bơi trẻ em',c:'outdoor',w:250,d:250,col:'#8fd8ef',dr:'poolKid'},
+ jacuzzi:{n:'Bồn sục Jacuzzi',c:'outdoor',w:220,d:220,col:'#8fd8ef',dr:'jacuzzi'},
+ deck:{n:'Sàn gỗ ngoài trời',c:'outdoor',w:400,d:300,col:'#b98f62',dr:'deck'},
+ lawn:{n:'Thảm cỏ',c:'outdoor',w:400,d:300,col:GR,dr:'lawn'},
+ pond:{n:'Hồ cá / non bộ',c:'outdoor',w:240,d:170,col:'#6bb8d4',dr:'pond'},
+ fountain:{n:'Đài phun nước',c:'outdoor',w:140,d:140,col:'#8fd8ef',dr:'fountain'},
+ lounger:{n:'Ghế nằm hồ bơi',c:'outdoor',w:70,d:200,col:'#f2efe6',dr:'lounger'},
+ lounger2:{n:'Cặp ghế nằm + bàn nhỏ',c:'outdoor',w:190,d:200,col:'#f2efe6',dr:'lounger2'},
+ parasol:{n:'Dù che nắng',c:'outdoor',w:260,d:260,col:'#e8692c',dr:'parasol'},
+ patio:{n:'Bàn ghế ngoài trời',c:'outdoor',w:170,d:170,col:'#8a6a4a',dr:'round'},
+ gbench:{n:'Ghế băng sân vườn',c:'outdoor',w:150,d:50,col:'#9c7048',dr:'gbench'},
+ bbq:{n:'Bếp nướng ngoài trời',c:'outdoor',w:180,d:65,col:'#c9c4bb',dr:'bbq',wall:1},
+ outshower:{n:'Vòi sen ngoài trời',c:'outdoor',w:60,d:60,col:'#e4e6e8',dr:'outshower'},
+ pergola:{n:'Giàn pergola',c:'outdoor',w:320,d:320,col:'#a97c55',dr:'pergola'},
+ gazebo:{n:'Chòi nghỉ lục giác',c:'outdoor',w:350,d:350,col:'#c47a4a',dr:'gazebo'},
+ tree:{n:'Cây bóng mát',c:'outdoor',w:300,d:300,col:'#4f9a45',dr:'tree'},
+ palm:{n:'Cây dừa / cọ',c:'outdoor',w:260,d:260,col:'#3f8a3a',dr:'palm'},
+ bush:{n:'Bụi cây',c:'outdoor',w:110,d:110,col:'#4f9a45',dr:'bush'},
+ flowerbed:{n:'Luống hoa',c:'outdoor',w:220,d:60,col:'#7a5a3a',dr:'flowerbed'},
+ lampg:{n:'Đèn sân vườn',c:'outdoor',w:34,d:34,col:'#f3e3b3',dr:'lampg'},
+ stepping:{n:'Lối đá lót',c:'outdoor',w:240,d:60,col:'#c9c4bb',dr:'stepping'},
+ slide:{n:'Cầu trượt (cầu tuột)',c:'kids',w:260,d:90,col:'#2f7de1',dr:'slide'},
+ playhouse:{n:'Nhà chòi + cầu trượt',c:'kids',w:330,d:170,col:'#e8b04a',dr:'playhouse'},
+ swing:{n:'Xích đu 2 chỗ',c:'kids',w:240,d:150,col:'#2f7de1',dr:'swing'},
+ seesaw:{n:'Bập bênh',c:'kids',w:240,d:40,col:'#e8692c',dr:'seesaw'},
+ sandbox:{n:'Hố cát',c:'kids',w:150,d:150,col:'#9c7048',dr:'sandbox'},
+ trampoline:{n:'Bạt nhún',c:'kids',w:300,d:300,col:'#2f7de1',dr:'trampoline'},
+ climb:{n:'Khung leo trèo',c:'kids',w:220,d:200,col:'#3d9a55',dr:'climb'},
+ springrider:{n:'Thú nhún',c:'kids',w:45,d:80,col:'#e8648a',dr:'springrider'},
+ merry:{n:'Đu quay xoay',c:'kids',w:170,d:170,col:'#e8648a',dr:'merry'},
+ ballpit:{n:'Nhà bóng',c:'kids',w:200,d:200,col:'#bfe3f2',dr:'ballpit'},
+ hoop:{n:'Rổ bóng rổ',c:'kids',w:120,d:110,col:'#d0482c',dr:'hoop'},
+ goal:{n:'Khung thành mini',c:'kids',w:180,d:80,col:'#f4f4f2',dr:'goal'},
+ tent:{n:'Lều chơi',c:'kids',w:130,d:130,col:'#f2c230',dr:'tent'},
+ playmat:{n:'Thảm xốp sân chơi',c:'kids',w:300,d:300,col:'#e8648a',dr:'playmat'},
+ inflatable:{n:'Hồ bơi phao trẻ em',c:'kids',w:200,d:200,col:'#2f7de1',dr:'inflatable'},
+});
+['car','moto','bike'].forEach(k=>{if(FURN[k])FURN[k].c='vehicle'});if(FURN.pool)FURN.pool.c='outdoor';
+const oi=CATS.findIndex(c=>c.k==='other');CATS.splice(oi<0?CATS.length:oi,0,{k:'vehicle',n:'Xe & garage'},{k:'outdoor',n:'Sân vườn & hồ bơi'},{k:'kids',n:'Trẻ em ngoài trời'});
+Object.assign(ALIAS,{hatchback:'hatch',small_car:'hatch',sedan:'car',automobile:'car',xe_hoi:'car',oto:'car',o_to:'car',suv_car:'suv',minivan:'van',mpv:'van',pickup_truck:'pickup',ban_tai:'pickup',truck_small:'truck',xe_tai:'truck',vespa:'scooter',xe_ga:'scooter',big_bike:'bigbike',motorcycle_big:'bigbike',car_port:'carport',parking:'parkslot',parking_slot:'parkslot',moto_rack:'motorack',bike_rack:'motorack',ev_charger:'evchg',charger:'evchg',work_bench:'workbench',tool_cabinet:'toolcab',garage_shelf:'garshelf',swimming_pool_l:'poolL',pool_l:'poolL',round_pool:'poolRound',pool_round:'poolRound',kidney_pool:'poolKidney',lap_pool:'poolLap',kids_pool:'poolKid',pool_kids:'poolKid',hot_tub:'jacuzzi',spa:'jacuzzi',decking:'deck',grass:'lawn',fish_pond:'pond',sun_lounger:'lounger',pool_chair:'lounger',pool_lounger:'lounger',lounge_pair:'lounger2',umbrella:'parasol',patio_set:'patio',outdoor_table:'patio',garden_bench:'gbench',barbecue:'bbq',grill:'bbq',outdoor_shower:'outshower',trellis:'pergola',pavilion:'gazebo',tree_big:'tree',palm_tree:'palm',coconut:'palm',shrub:'bush',flower_bed:'flowerbed',garden_lamp:'lampg',stepping_stones:'stepping',playground_slide:'slide',kids_slide:'slide',slide_kids:'slide',cau_tuot:'slide',cau_truot:'slide',play_house:'playhouse',swing_set:'swing',swings:'swing',see_saw:'seesaw',sand_pit:'sandbox',sand_box:'sandbox',bouncer:'trampoline',jungle_gym:'climb',climbing_frame:'climb',spring_horse:'springrider',roundabout:'merry',ball_pit:'ballpit',basketball_hoop:'hoop',mini_goal:'goal',play_tent:'tent',foam_mat:'playmat',inflatable_pool:'inflatable'});
+Object.assign(ALIAS,{"cầu tuột": "slide", "cầu trượt": "slide", "cầu trượt trẻ em": "slide", "nhà chòi": "playhouse", "xích đu": "swing", "xích đu trẻ em": "swing", "bập bênh": "seesaw", "hố cát": "sandbox", "bạt nhún": "trampoline", "nhà bóng": "ballpit", "khung leo trèo": "climb", "thú nhún": "springrider", "đu quay": "merry", "rổ bóng rổ": "hoop", "khung thành": "goal", "lều chơi": "tent", "thảm xốp": "playmat", "hồ bơi phao": "inflatable", "hồ bơi trẻ em": "poolKid", "hồ bơi hình chữ l": "poolL", "hồ bơi chữ l": "poolL", "hồ bơi tròn": "poolRound", "hồ bơi hình thận": "poolKidney", "hồ bơi dài": "poolLap", "ghế hồ bơi": "lounger", "ghế nằm hồ bơi": "lounger", "ghế nằm": "lounger", "ghế tắm nắng": "lounger", "dù che nắng": "parasol", "dù": "parasol", "bàn ghế ngoài trời": "patio", "bàn ghế sân vườn": "patio", "ghế sân vườn": "gbench", "bếp nướng": "bbq", "vòi sen ngoài trời": "outshower", "giàn hoa": "pergola", "chòi nghỉ": "gazebo", "chòi": "gazebo", "cây xanh": "tree", "cây dừa": "palm", "bụi cây": "bush", "luống hoa": "flowerbed", "đèn sân vườn": "lampg", "sàn gỗ": "deck", "cỏ": "lawn", "bãi cỏ": "lawn", "hồ cá": "pond", "non bộ": "pond", "đài phun nước": "fountain", "bồn sục": "jacuzzi", "xe hơi": "car", "ô tô": "car", "xe ô tô": "car", "xe con": "car", "xe 7 chỗ": "suv", "xe bán tải": "pickup", "xe tải": "truck", "xe ga": "scooter", "xe số": "moto", "xe côn tay": "bigbike", "mái che xe": "carport", "nhà để xe": "carport", "chỗ đậu xe": "parkslot", "chỗ đỗ xe": "parkslot", "giá để xe": "motorack", "trạm sạc": "evchg", "bàn dụng cụ": "workbench", "tủ đồ nghề": "toolcab", "kệ kho": "garshelf", "garage": "carport", "gara": "carport"});
+})();
 CATS.push({k:'mine',n:'Của tôi (ảnh)'});
 
 /* ---------- Nội thất từ ảnh (thư viện riêng) ---------- */
@@ -1902,7 +2204,19 @@ function addDoorFor(rA,rB,kind){kind=kind||'door';const ow=kind==='door'?(rtype(
  else{const inner=segs.filter(g=>{const [A,B]=segSide(g.w,(g.s0+g.s1)/2);return A&&B});if(inner.length)segs=inner}
  segs.sort((a,b)=>(b.s1-b.s0)-(a.s1-a.s0));
  for(const g of segs){let ww=ow;let p=freeSpot(g.w,ww,g.s0,g.s1);if(p==null&&kind==='window'){ww=60;p=freeSpot(g.w,ww,g.s0,g.s1)}if(p==null)continue;const [ux,uy]=wdir(g.w);const o=placeOpening(kind,kind==='door'?'single':(ww<100?'small':'win'),g.w.x1+ux*p,g.w.y1+uy*p,ww,3);if(o)return o}return null}
-function localCmd(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!n)return null;
+function localCmd(text){const r0=localCmd0(text);if(r0)return r0;return localFurn(text)}
+/* lệnh nhanh: "thêm cầu tuột", "đặt 2 ghế nằm hồ bơi vào sân", "thêm xe máy vào gara" */
+function localFurn(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!/(^| )(them|dat|bo tri|cho|ve|tao|lap|sam)( |$)/.test(n))return null;
+ let best=null,bl=0;const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const test=(k,type)=>{k=norm(k).replace(/_/g,' ').trim();if(k.length<3||k.length<=bl)return;if(new RegExp('(^|\\s)'+esc(k)+'(\\s|$)').test(n)){best=type;bl=k.length}};
+ for(const [key,F] of Object.entries(FURN)){if(key==='box'||F.user)continue;String(F.n).split(/[()\/]/).forEach(x=>test(x,key))}
+ for(const [al,t] of Object.entries(ALIAS)){if(FURN[t]&&!FURN[t].user)test(al,t)}
+ if(!best)return null;const F=FURN[best];
+ let qty=1;const mq=n.match(/(?:^|\s)(\d{1,2})(?!\s*(?:x\b|m\b|cm\b|do\b))(?:\s*(?:cai|chiec|bo|con|cay|cap))?(?=\s|$)/);if(mq)qty=Math.min(12,Math.max(1,+mq[1]));
+ const R=roomInText(n)||selRoom();let cx,cy;if(R){[cx,cy]=centroid(R.pts)}else{const cv=$('#cv');cx=(cv.clientWidth/2-V.ox)/V.z;cy=(cv.clientHeight/2-V.oy)/V.z}
+ let last=null;for(let i=0;i<qty;i++){const x=cx+((i%3)-(Math.min(qty,3)-1)/2)*(F.w+25),y=cy+Math.floor(i/3)*(F.d+25);last=addItem(best,x,y,{rot:0});if(R)magnet(last,60)}
+ commit();if(last)setSel('item',last.id);return {msg:`Đã thêm ${qty>1?qty+' ':''}“${F.n}”${R?` vào “${R.name}”`:' ở giữa màn hình'}. Kéo để đặt đúng chỗ, bấm xoay (Q/E) nếu cần.`}}
+function localCmd0(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!n)return null;
  const R=roomInText(n)||(/(phong nay|phong dang chon|phong do)/.test(n)?selRoom():null)||(/them (1 |mot )?(phong|nha|wc|toilet|bep|kho|cho|ban)/.test(n)?null:roomByType(n));
  const all=/(toan bo|ca nha|ca mat bang|tat ca|het cac|moi phong|cac phong)/.test(n);
  const relayout=/(bo tri|sap xep|sap dat)/.test(n);
