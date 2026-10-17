@@ -50,6 +50,11 @@ button{cursor:pointer;border:0;background:none;padding:0}
 #ctxbar button:hover{background:rgba(255,255,255,.13)}
 #ctxbar .ttl{padding:7px 10px 7px 8px;font-size:12.5px;opacity:.75;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
 #bDone{position:absolute;right:14px;bottom:14px;background:var(--acc);color:#fff;font-weight:650;padding:11px 18px;border-radius:12px;box-shadow:var(--sh);z-index:4}
+#floors{position:absolute;left:10px;top:58px;display:flex;flex-direction:column;gap:5px;z-index:3;max-height:calc(100% - 150px);overflow-y:auto;scrollbar-width:none}
+#floors::-webkit-scrollbar{display:none}
+#floors .fb{background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12.5px;font-weight:600;box-shadow:var(--sh);min-width:62px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;flex:none}
+#floors .fb.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+#floors .fb.add{font-weight:500;color:#586069;border-style:dashed;background:rgba(255,255,255,.88)}
 #zoomc{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;background:#fff;border-radius:12px;box-shadow:var(--sh);overflow:hidden;z-index:3}
 #zoomc button{width:38px;height:38px;font-size:18px;color:#3a3f45}
 #zoomc button:hover{background:var(--soft)}
@@ -240,6 +245,7 @@ kbd{background:var(--soft);border:1px solid var(--line);border-bottom-width:2px;
 
  <main id="stage">
   <canvas id="cv" tabindex="0"></canvas>
+  <div id="floors"></div>
   <div id="opts"></div>
   <div id="ctxbar" hidden></div>
   <button id="bDone" hidden>✓ Xong</button>
@@ -619,8 +625,19 @@ def shelf(w, d, seed=1):
                 x += 8
     return ps
 
-def parts_for(t, w, d, H, seed=1):
+def parts_for(t, w, d, H, seed=1, ctx=None):
     r = min(w, d) / 2
+    ctx = ctx or {}
+    if t == 'elevator':
+        th = 6; dw = w * .56; fl = (w - dw) / 2
+        ps = [B(0, -d / 2 + th / 2, 0, w, th, H, 'metal'), B(-w / 2 + th / 2, 0, 0, th, d, H, 'metal'), B(w / 2 - th / 2, 0, 0, th, d, H, 'metal')]
+        ps += [B(-(dw / 2 + fl / 2), d / 2 - th / 2, 0, fl, th, H, 'metal'), B(dw / 2 + fl / 2, d / 2 - th / 2, 0, fl, th, H, 'metal'), B(0, d / 2 - th / 2, 214, dw, th, max(6, H - 214), 'metal')]
+        ps += [B(-dw / 4, d / 2 - 2, 0, dw / 2 - .6, 3, 212, 'chrome'), B(dw / 4, d / 2 - 2, 0, dw / 2 - .6, 3, 212, 'chrome'), B(0, d / 2 + 1, 222, 14, 1.5, 6, 'lamp')]
+        return ps
+    if t == 'stairs' and ctx.get('multi') and ctx.get('top'):
+        # tầng trên cùng: ô thang (lỗ) có lan can ba phía
+        ps = [B(0, 0, .3, w, d, .5, 'black'), B(-w / 2 + 1.5, 0, 0, 3, d, 100, 'dark'), B(w / 2 - 1.5, 0, 0, 3, d, 100, 'dark'), B(0, d / 2 - 1.5, 0, w, 3, 100, 'dark')]
+        return ps + [B(0, d / 2 - 1.5, 98, w, 4, 3, 'chrome')]
     if t in ('bed2', 'bedK', 'bed1'): return bed(w, d)
     if t in ('sofa3', 'sofa2', 'armchair'): return sofa(w, d)
     if t == 'sofaL': return sofaL(w, d)
@@ -947,7 +964,7 @@ FABRIC = {'sofa3', 'sofa2', 'sofaL', 'armchair', 'bed2', 'bedK', 'bed1', 'rug', 
 SHINY = {'fridge', 'washer', 'ac', 'car', 'moto', 'piano'}
 
 # ---------- dọn cảnh ----------
-def _coll():
+def _coll(clear=True):
     sc = bpy.context.scene
     c = bpy.data.collections.get(COLL_NAME)
     if c is None:
@@ -957,7 +974,7 @@ def _coll():
             sc.collection.children.link(c)
         except Exception:
             pass
-    for ob in list(c.objects):
+    for ob in (list(c.objects) if clear else []):
         data = ob.data
         bpy.data.objects.remove(ob, do_unlink=True)
         if data is not None and data.users == 0:
@@ -965,10 +982,11 @@ def _coll():
                 if data.name in coll and coll[data.name] == data:
                     coll.remove(data)
                     break
-    for m in list(bpy.data.materials):
-        if m.name.startswith('MB_') and m.users == 0:
-            bpy.data.materials.remove(m)
-    MATS.clear()
+    if clear:
+        for m in list(bpy.data.materials):
+            if m.name.startswith('MB_') and m.users == 0:
+                bpy.data.materials.remove(m)
+        MATS.clear()
     return c
 
 def _obj(coll, name, data):
@@ -985,11 +1003,39 @@ def _mesh_obj(coll, name, bm, mats):
         me.materials.append(m)
     return _obj(coll, name, me)
 
+# ---------- nhiều tầng ----------
+SLAB = 20.0
+_OUT_WORDS = ('san', 'vuon', 'ho boi', 'bai ', 'garden', 'ho ca', 'pool')
+
+def _is_out(name):
+    import unicodedata
+    n = unicodedata.normalize('NFD', str(name or '').lower().replace('\u0111', 'd')).encode('ascii', 'ignore').decode()
+    n = n + ' '
+    return any(n.startswith(w) or (' ' + w) in n for w in _OUT_WORDS)
+
+def _prism(pts, z0, z1):
+    b = bmesh.new()
+    try:
+        top = [b.verts.new((x * S_, -y * S_, z1 * S_)) for x, y in pts]
+        bot = [b.verts.new((x * S_, -y * S_, z0 * S_)) for x, y in pts]
+        n = len(pts)
+        b.faces.new(top); b.faces.new(bot[::-1])
+        for i in range(n):
+            b.faces.new((top[i], bot[i], bot[(i + 1) % n], top[(i + 1) % n]))
+        bmesh.ops.recalc_face_normals(b, faces=list(b.faces))
+        return b
+    except Exception:
+        b.free()
+        return None
+
 # ---------- dựng cảnh ----------
-def build_scene(plan, opts=None):
+def _build_one(plan, opts=None):
     opts = dict(opts or {})
     plan = plan or {}
-    coll = _coll()
+    geom = not opts.get('_nogeom')
+    multi = bool(opts.get('_multi'))
+    noenv = bool(opts.get('_noenv'))
+    coll = _coll(not opts.get('_keep'))
     SM = std_mats()
     walls = plan.get('walls', []) or []
     ops = plan.get('openings', []) or []
@@ -1017,7 +1063,7 @@ def build_scene(plan, opts=None):
     mat('door_main', hex2lin('#6b4126'), .4)
     wid = {w['id']: w for w in walls}
     maxH = 0
-    for w in walls:
+    for w in (walls if geom else []):
         x1, y1, x2, y2 = float(w['x1']), float(w['y1']), float(w['x2']), float(w['y2'])
         L = math.hypot(x2 - x1, y2 - y1)
         if L < 1: continue
@@ -1082,6 +1128,7 @@ def build_scene(plan, opts=None):
                     hg, ot = (e2, e1) if o.get('flip') else (e1, e2)
                     leaf(hg, ot, W)
     if maxH == 0: maxH = Hdef
+    if opts.get('_fh'): maxH = float(opts['_fh'])
     if len(bm.faces):
         if view == 'top':
             bm.normal_update()
@@ -1110,7 +1157,18 @@ def build_scene(plan, opts=None):
     _polys = [[(float(p[0]), float(p[1])) for p in r['pts']] for r in rooms]
     _cen = [(sum(p[0] for p in q) / len(q), sum(p[1] for p in q) / len(q)) for q in _polys]
     _ar = [_area(q) for q in _polys]
-    for ri, r in enumerate(rooms):
+    slab_m = mat('slab', hex2lin('#bdb9b1'), .85) if (geom and opts.get('_slab')) else None
+    if slab_m is not None:
+        # sàn bê tông dày 20 cm dưới các phòng trong nhà (và dưới phần nhà của tầng bên dưới); phòng lồng nhau được nâng 0,4 mm / lớp để mặt trên không trùng nhau
+        sp = [(_polys[i], r.get('name', 'Phong')) for i, r in enumerate(rooms) if not _is_out(r.get('name', ''))]
+        sp += [([(float(p[0]), float(p[1])) for p in pq], 'X%d' % q) for q, pq in enumerate(opts.get('_slab_extra') or [])]
+        sar = [_area(q) for q, _ in sp]
+        scn = [(sum(p[0] for p in q) / len(q), sum(p[1] for p in q) / len(q)) for q, _ in sp]
+        for si, (spts, snm) in enumerate(sp):
+            sd = sum(1 for sj in range(len(sp)) if sj != si and (sar[sj] > sar[si] or (sar[sj] == sar[si] and sj < si)) and _pip(scn[si][0], scn[si][1], sp[sj][0]))
+            bs = _prism(spts, -SLAB, sd * .04)
+            if bs is not None: _mesh_obj(coll, 'MB_Slab_' + snm, bs, [slab_m])
+    for ri, r in (enumerate(rooms) if geom else []):
         pts = _polys[ri]; allpts += pts
         # phòng nằm trong phòng khác (vd. sân vườn bao quanh cả nhà) -> nâng sàn lên một lớp để không bị trùng mặt
         depth = sum(1 for rj in range(len(rooms)) if rj != ri and (_ar[rj] > _ar[ri] or (_ar[rj] == _ar[ri] and rj < ri)) and _pip(_cen[ri][0], _cen[ri][1], _polys[rj]))
@@ -1136,17 +1194,23 @@ def build_scene(plan, opts=None):
         allpts.append((it['x'], it['y']))
     if not allpts: allpts = [(0, 0), (500, 500)]
     X1 = min(p[0] for p in allpts); X2 = max(p[0] for p in allpts); Y1 = min(p[1] for p in allpts); Y2 = max(p[1] for p in allpts)
+    if opts.get('_bbox'):
+        X1, X2, Y1, Y2 = [float(v) for v in opts['_bbox']]
     cx, cy = (X1 + X2) / 2, (Y1 + Y2) / 2; bw, bh = max(100, X2 - X1), max(100, Y2 - Y1)
+    if opts.get('_hi') is not None: maxH = float(opts['_hi'])
+    zlo = float(opts.get('_lo', 0) or 0)
 
     # --- nền đất ---
-    b = bmesh.new()
-    gs = max(bw, bh) * 3
-    add_box(b, cx, cy, -2, gs, gs, 1.8, 0, 0)
-    _mesh_obj(coll, 'MB_Nen', b, [mat('ground', hex2lin(opts.get('ground_color', '#cfcbc3')), .9)])
+    if not noenv:
+        b = bmesh.new()
+        gs = max(bw, bh) * 3
+        add_box(b, cx, cy, float(opts.get('_ground_z', -2)), gs, gs, 1.8, 0, 0)
+        _mesh_obj(coll, 'MB_Nen', b, [mat('ground', hex2lin(opts.get('ground_color', '#cfcbc3')), .9)])
 
     # --- nội thất ---
     ulib = plan.get('ulib') or {}
-    for k, it in enumerate(items):
+    ctx = {'multi': multi, 'top': bool(opts.get('_top', True))}
+    for k, it in (enumerate(items) if geom else []):
         t = it.get('type', 'box')
         if str(t).startswith('u_'):
             e = ulib.get(t[2:]) or {}
@@ -1161,7 +1225,7 @@ def build_scene(plan, opts=None):
         rough = .9 if t in FABRIC else .25 if t in SHINY else .5
         local = {'main': lambda c=col, r_=rough: mat('c_' + c.lstrip('#') + '_%d' % int(r_ * 10), hex2lin(c), r_, 0, 0, 0, .5 if t in SHINY else 0),
                  'mainl': lambda c=col: mat('cl_' + c.lstrip('#'), hex2lin(c, 1.12), .85)}
-        ps = parts_for(t, w, d, maxH, k + 1)
+        ps = parts_for(t, w, d, maxH, k + 1, ctx)
         b = bmesh.new(); used = []
         for p in ps:
             key = p[5] if p[0] == 'sph' else p[7]
@@ -1185,7 +1249,7 @@ def build_scene(plan, opts=None):
         stats['items'] += 1
 
     # --- chữ tên phòng ---
-    if opts.get('labels'):
+    if opts.get('labels') and geom:
         tm = mat('label', hex2lin('#1f2328'), .6, 0, 0, .3)
         for r in rooms:
             pts = r['pts']; a = 0; sx = sy = 0
@@ -1202,7 +1266,7 @@ def build_scene(plan, opts=None):
     # --- ánh sáng ---
     sc = bpy.context.scene
     sun_cfg = {'day': (52, 2.6, (1.0, .97, .92)), 'sunset': (9, 2.6, (1.0, .62, .36)), 'night': (-1, 0, (1, 1, 1))}[light if light in ('day', 'sunset', 'night') else 'day']
-    if sun_cfg[0] > 0:
+    if sun_cfg[0] > 0 and not noenv:
         ld = bpy.data.lights.new('MB_MatTroi', 'SUN'); ld.energy = sun_cfg[1]; ld.color = sun_cfg[2]
         try: ld.angle = math.radians(1.2)
         except Exception: pass
@@ -1210,7 +1274,7 @@ def build_scene(plan, opts=None):
         stats['lights'] += 1
     wpm = {'day': 6, 'sunset': 18, 'night': 28}.get(light, 9) * float(opts.get('lamp_power', 1.0))
     lcol = (1.0, .93, .84) if light == 'day' else (1.0, .82, .62)
-    for r in rooms:
+    for r in (rooms if geom else []):
         pts = r['pts']; xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
         a = 0
         for i in range(len(pts)):
@@ -1222,6 +1286,9 @@ def build_scene(plan, opts=None):
         o = _obj(coll, 'MB_Den_' + r.get('name', ''), ld)
         o.location = ((min(xs) + max(xs)) / 2 * S_, -(min(ys) + max(ys)) / 2 * S_, (maxH - 12) * S_)
         stats['lights'] += 1
+
+    if noenv:
+        return stats
 
     # --- bầu trời ---
     w = sc.world or bpy.data.worlds.new('MB_World'); sc.world = w
@@ -1252,7 +1319,7 @@ def build_scene(plan, opts=None):
     # --- camera ---
     res = int(opts.get('res', 1600))
     cd = bpy.data.cameras.new('MB_Camera'); cam = _obj(coll, 'MB_Camera', cd); sc.camera = cam
-    C3 = Vector((cx * S_, -cy * S_, 0)); Lm = max(bw, bh) * S_
+    C3 = Vector((cx * S_, -cy * S_, (zlo + maxH) * S_ * .35 if multi else 0)); Lm = max(bw, bh) * S_
     if view == 'top':
         cd.type = 'ORTHO'; asp = min(2.2, max(.45, bw / bh))
         cd.ortho_scale = max(bw, bh) * S_ * 1.08
@@ -1274,13 +1341,14 @@ def build_scene(plan, opts=None):
             for cx_, cy_, tx_, ty_ in ((x1_ + 45, y2_ - 45, x2_, y1_), (x2_ - 45, y2_ - 45, x1_, y1_), (x1_ + 45, y1_ + 45, x2_, y2_), (x2_ - 45, y1_ + 45, x1_, y2_)):
                 sc_ = min([math.hypot(cx_ - ox, cy_ - oy) - orad for ox, oy, orad in obst] or [999])
                 if best is None or sc_ > best[0]: best = (sc_, cx_, cy_, tx_, ty_)
-            loc = Vector((best[1] * S_, -best[2] * S_, 1.55)); tgt = Vector((best[3] * S_, -best[4] * S_, 1.0))
+            ez = float(opts.get('_eye_z0', 0) or 0) * S_
+            loc = Vector((best[1] * S_, -best[2] * S_, 1.55 + ez)); tgt = Vector((best[3] * S_, -best[4] * S_, 1.0 + ez))
             cd.lens = 16
         else:
             cd.lens = 30
             dv = Vector((1.0, -.45, 1.25)) if bh > bw * 1.4 else Vector((.42, -1.0, 1.25))
             tgt = C3 + Vector((0, 0, .2))
-            loc = _fit_cam(cd, dv.normalized(), tgt, (X1 * S_, -Y2 * S_, 0), (X2 * S_, -Y1 * S_, maxH * S_), 16 / 9)
+            loc = _fit_cam(cd, dv.normalized(), tgt, (X1 * S_, -Y2 * S_, zlo * S_), (X2 * S_, -Y1 * S_, maxH * S_), 16 / 9)
         cam.location = loc
         cam.rotation_euler = (tgt - loc).to_track_quat('-Z', 'Y').to_euler()
         cd.clip_end = 500
@@ -1289,6 +1357,97 @@ def build_scene(plan, opts=None):
 
     setup_render(opts)
     _ui_view()
+    return stats
+
+def build_scene(plan, opts=None):
+    plan = plan or {}
+    fl = plan.get('floors') or []
+    if len(fl) < 2:
+        return _build_one(plan, opts)
+    return _build_multi(plan, opts)
+
+def _build_multi(plan, opts=None):
+    """Nhiều tầng: mỗi tầng dựng riêng rồi nâng lên đúng cao độ; sàn bê tông dày 20 cm giữa các tầng."""
+    opts = dict(opts or {})
+    fls = sorted(plan['floors'], key=lambda f: f.get('lv', 0))
+    view = opts.get('view', 'iso')
+    sel = opts.get('floor_sel', 'all')
+    # chọn các tầng được hiển thị
+    if sel == 'explode':
+        show = list(fls)
+    else:
+        try:
+            k = int(sel)
+        except Exception:
+            k = None
+        if sel == 'all' or k is None:
+            show = [f for f in fls if f.get('lv', 0) >= 0]
+        elif k >= 0:
+            show = [f for f in fls if 0 <= f.get('lv', 0) <= k]
+        else:
+            show = [f for f in fls if f.get('lv', 0) <= k]
+    if not show:
+        show = fls[:1]
+    # cao độ nền của từng tầng (cm)
+    z0 = {}
+    base = [f for f in fls if f.get('lv', 0) >= 0]
+    z = 0.0
+    for f in base:
+        z0[id(f)] = z
+        z += float(f.get('h') or 300)
+    neg = [f for f in fls if f.get('lv', 0) < 0]
+    z = 0.0
+    for f in reversed(neg):
+        z -= float(f.get('h') or 300)
+        z0[id(f)] = z
+    gap = 260.0 if sel == 'explode' else 0.0
+    zpos = {}
+    for i, f in enumerate(fls):
+        zpos[id(f)] = z0[id(f)] + gap * f.get('lv', 0)
+    cut_all = bool(opts.get('cutaway')) and view != 'eye'
+    stats = {'walls': 0, 'rooms': 0, 'items': 0, 'lights': 0}
+    allx, ally = [], []
+    for i, f in enumerate(show):
+        top = (i == len(show) - 1)
+        po = dict(opts)
+        po.update({'_slab_extra': ([[tuple(p) for p in r.get('pts', [])] for r in (show[i - 1].get('rooms') or []) if len(r.get('pts', [])) >= 3 and not _is_out(r.get('name', ''))] if i > 0 else []), '_keep': i > 0, '_noenv': True, '_multi': True, '_top': top, '_slab': i > 0,
+                   '_fh': float(f.get('h') or 300), 'wall_h': float(f.get('h') or 300),
+                   'cutaway': cut_all and (top or sel == 'explode'),
+                   'ceiling': bool(opts.get('ceiling', view == 'eye')) and top,
+                   'labels': bool(opts.get('labels')) and top and view == 'top'})
+        fp = {'walls': f.get('walls') or [], 'openings': f.get('openings') or [], 'rooms': f.get('rooms') or [],
+              'items': f.get('items') or [], 'ulib': plan.get('ulib')}
+        coll0 = bpy.data.collections.get(COLL_NAME)
+        before = set(coll0.objects) if (coll0 is not None and i > 0) else set()
+        st = _build_one(fp, po)
+        coll1 = bpy.data.collections.get(COLL_NAME)
+        dz = zpos[id(f)] * S_
+        if dz:
+            for ob in coll1.objects:
+                if ob not in before:
+                    ob.location.z += dz
+        for k in stats:
+            stats[k] += st.get(k, 0)
+        for w in fp['walls']:
+            allx += [w['x1'], w['x2']]; ally += [w['y1'], w['y2']]
+        for r in fp['rooms']:
+            for p in r.get('pts', []):
+                allx.append(p[0]); ally.append(p[1])
+        for it in fp['items']:
+            allx.append(it['x']); ally.append(it['y'])
+    topf = show[-1]
+    zlo = zpos[id(show[0])]
+    zhi = zpos[id(topf)] + float(topf.get('h') or 300)
+    env = {'walls': [], 'openings': [], 'rooms': [], 'items': []}
+    eo = dict(opts)
+    eo.update({'_keep': True, '_multi': True, '_nogeom': True, '_bbox': (min(allx or [0]), max(allx or [500]), min(ally or [0]), max(ally or [500])),
+               '_hi': zhi, '_lo': zlo, '_ground_z': (zlo - 22) if zlo < 0 else -2, '_eye_z0': zpos[id(topf)], '_fh': float(topf.get('h') or 300),
+               'cutaway': cut_all})
+    if view == 'eye':
+        env.update({'walls': topf.get('walls') or [], 'openings': topf.get('openings') or [], 'rooms': topf.get('rooms') or [], 'items': topf.get('items') or []})
+    r = _build_one(env, eo)
+    stats['lights'] += 1
+    stats['floors'] = len(show)
     return stats
 
 def _fit_cam(cd, dv, tgt, lo, hi, aspect):
@@ -1809,7 +1968,8 @@ const DR={
  altar(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);rr(c,-w/2+5,-d/2+5,w-10,d-10,2);fs(c,null,sh(col,.35));circ(c,0,-d*.08,Math.min(d*.16,12));fs(c,'#c8a25a');for(const s of [-1,1]){circ(c,s*w*.33,-d*.12,6);fs(c,'#ecdcb8');circ(c,s*w*.18,d*.18,5);fs(c,'#e8c06a')}circ(c,0,d*.22,8);fs(c,'#f2d9a8')},
  moto(c,w,d,col){const tw=Math.min(13,d*.2),wl=w*.26;rr(c,-w/2,-tw/2,wl,tw,5);fs(c,'#3b3f44');rr(c,w/2-wl,-tw/2,wl,tw,5);fs(c,'#3b3f44');ell(c,-w*.02,0,w*.34,d*.27);fs(c,col);rr(c,-w*.31,-d*.14,w*.34,d*.28,8);fs(c,sh(col,-.45));const lw=c.lineWidth;c.lineWidth=Math.max(lw*2,2.5);ln(c,w*.27,-d/2+4,w*.27,d/2-4);c.lineWidth=lw;circ(c,w*.25,-d/2+5,4);fs(c,'#cfd6dc');circ(c,w*.25,d/2-5,4);fs(c,'#cfd6dc')},
  car(c,w,d,col){rr(c,-w/2,-d/2,w,d,Math.min(d*.28,38));fs(c,col);c.beginPath();c.moveTo(w*.08,-d*.4);c.lineTo(w*.24,-d*.32);c.lineTo(w*.24,d*.32);c.lineTo(w*.08,d*.4);c.closePath();fs(c,'#a9bccb');c.beginPath();c.moveTo(-w*.34,-d*.33);c.lineTo(-w*.26,-d*.4);c.lineTo(-w*.26,d*.4);c.lineTo(-w*.34,d*.33);c.closePath();fs(c,'#a9bccb');rr(c,-w*.26,-d*.4,w*.34,d*.8,8);fs(c,sh(col,-.12));rr(c,w*.06,-d/2-7,12,8,2);fs(c,sh(col,-.3));rr(c,w*.06,d/2-1,12,8,2);fs(c,sh(col,-.3))},
- stairs(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);for(let y=-d/2+25;y<d/2;y+=25)ln(c,-w/2,y,w/2,y);const lw=c.lineWidth;c.lineWidth=lw*1.6;ln(c,0,d/2-14,0,-d/2+18);c.beginPath();c.moveTo(-8,-d/2+30);c.lineTo(0,-d/2+16);c.lineTo(8,-d/2+30);c.stroke();c.lineWidth=lw;c.fillStyle='#5b6168';c.font=`600 ${Math.max(8,Math.min(w*.16,16))}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.save();c.translate(-w*.24,d/2-28);c.fillText('LÊN',0,0);c.restore()},
+ elevator(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,'#dde2e6');rr(c,-w/2+7,-d/2+7,w-14,d-14,1);c.stroke();c.save();c.globalAlpha=.4;ln(c,-w/2+7,-d/2+7,w/2-7,d/2-7);ln(c,w/2-7,-d/2+7,-w/2+7,d/2-7);c.restore();const lw=c.lineWidth;c.lineWidth=lw*2.2;ln(c,-w*.3,d/2-3,w*.3,d/2-3);c.lineWidth=lw;c.fillStyle='#4a5159';c.font=`700 ${Math.max(7,Math.min(w*.12,15))}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('THANG MÁY',0,-d*.12)},
+ stairs(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);for(let y=-d/2+25;y<d/2;y+=25)ln(c,-w/2,y,w/2,y);const lw=c.lineWidth;c.lineWidth=lw*1.6;ln(c,0,d/2-14,0,-d/2+18);c.beginPath();c.moveTo(-8,-d/2+30);c.lineTo(0,-d/2+16);c.lineTo(8,-d/2+30);c.stroke();c.lineWidth=lw;c.fillStyle='#5b6168';c.font=`600 ${Math.max(7,Math.min(w*.16,16))*(stLbl().length>5?.72:1)}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.save();c.translate(-w*.24,d/2-28);c.fillText(stLbl(),0,0);c.restore()},
  piano(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);rr(c,-w/2+4,d/2-17,w-8,13,1);fs(c,'#fff');for(let x=-w/2+8;x<w/2-4;x+=5)ln(c,x,d/2-17,x,d/2-4)},
  column(c,w,d,col){rr(c,-w/2,-d/2,w,d,0);fs(c,col,0)},
  ac(c,w,d,col){rr(c,-w/2,-d/2,w,d,5);fs(c,col);ln(c,-w/2+6,d/2-6,w/2-6,d/2-6);ln(c,-w/2+6,d/2-10,w/2-6,d/2-10)},
@@ -1863,6 +2023,7 @@ const FURN={
  moto:{n:'Xe máy',c:'other',w:190,d:70,col:'#c0392b',dr:'moto'},
  car:{n:'Ô tô',c:'other',w:450,d:180,col:'#8e9aa6',dr:'car'},
  stairs:{n:'Cầu thang',c:'other',w:100,d:300,col:'#e8e1d6',dr:'stairs'},
+ elevator:{n:'Thang máy',c:'other',w:160,d:160,col:'#dde2e6',dr:'elevator'},
  piano:{n:'Đàn piano',c:'other',w:150,d:60,col:'#2f3136',dr:'piano',wall:1},
  column:{n:'Cột',c:'other',w:30,d:30,col:'#3a3e43',dr:'column'},
  pool:{n:'Hồ bơi',c:'other',w:600,d:300,col:'#9fd3ea',dr:'pool'},
@@ -2048,7 +2209,7 @@ function uImg(id){if(UIMG[id])return UIMG[id];const e=ULIB[id];if(!e||!e.img)ret
 function regUser(e){FURN['u_'+e.id]={n:e.n||'Đồ của tôi',c:'mine',w:e.w,d:e.d,h:e.h,col:e.col||'#cccccc',dr:'img',wall:e.wall?1:0,user:e.id}}
 Object.values(ULIB).forEach(regUser);
 function saveULIB(){if(!LS.set('mb_ulib',ULIB))toast('Bộ nhớ trình duyệt đầy — xoá bớt nội thất ảnh hoặc dùng ảnh nhỏ hơn',4000)}
-function usedUlib(){const o={};for(const it of S.items)if(String(it.type).startsWith('u_')){const id=it.type.slice(2);if(ULIB[id])o[id]=ULIB[id]}return o}
+function usedUlib(){const o={};for(const it of allItems())if(String(it.type).startsWith('u_')){const id=it.type.slice(2);if(ULIB[id])o[id]=ULIB[id]}return o}
 function mergeUlib(u){if(!u)return;for(const id in u){ULIB[id]=u[id];delete UIMG[id];regUser(u[id])}saveULIB()}
 function simplifyPoly(pts,eps){if(pts.length<4)return pts;const dp=(a,b)=>{let dm=0,ix=0;const [x1,y1]=pts[a],[x2,y2]=pts[b],L=hyp(x2-x1,y2-y1)||1e-9;for(let i=a+1;i<b;i++){const d=Math.abs((x2-x1)*(y1-pts[i][1])-(x1-pts[i][0])*(y2-y1))/L;if(d>dm){dm=d;ix=i}}return dm>eps?[...dp(a,ix).slice(0,-1),...dp(ix,b)]:[pts[a],pts[b]]};const r=dp(0,pts.length-1);const out=[];for(const p of r){const q=[+p[0].toFixed(4),+p[1].toFixed(4)];const l=out[out.length-1];if(!l||l[0]!==q[0]||l[1]!==q[1])out.push(q)}return out}
 function analyzeImage(img,removeBg,tol){
@@ -2217,7 +2378,7 @@ function addDoorFor(rA,rB,kind){kind=kind||'door';const ow=kind==='door'?(rtype(
  else{const inner=segs.filter(g=>{const [A,B]=segSide(g.w,(g.s0+g.s1)/2);return A&&B});if(inner.length)segs=inner}
  segs.sort((a,b)=>(b.s1-b.s0)-(a.s1-a.s0));
  for(const g of segs){let ww=ow;let p=freeSpot(g.w,ww,g.s0,g.s1);if(p==null&&kind==='window'){ww=60;p=freeSpot(g.w,ww,g.s0,g.s1)}if(p==null)continue;const [ux,uy]=wdir(g.w);const o=placeOpening(kind,kind==='door'?'single':(ww<100?'small':'win'),g.w.x1+ux*p,g.w.y1+uy*p,ww,3);if(o)return o}return null}
-function localCmd(text){const r0=localCmd0(text);if(r0)return r0;return localFurn(text)}
+function localCmd(text){const rf=localFloor(text);if(rf)return rf;const r0=localCmd0(text);if(r0)return r0;return localFurn(text)}
 /* lệnh nhanh: "thêm cầu tuột", "đặt 2 ghế nằm hồ bơi vào sân", "thêm xe máy vào gara" */
 function localFurn(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!/(^| )(them|dat|bo tri|cho|ve|tao|lap|sam)( |$)/.test(n))return null;
  let best=null,bl=0;const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -2286,7 +2447,7 @@ function deleteRoomAll(r){const others=S.rooms.filter(x=>x!==r);const del=S.wall
 /* ================= Lịch sử (hoàn tác) ================= */
 const H={st:[],i:-1};
 function histReset(){H.st=[JSON.stringify(S)];H.i=0;updUndo()}
-function commit(){const s=JSON.stringify(S);if(H.st[H.i]===s){refresh();return}H.st=H.st.slice(0,H.i+1);H.st.push(s);if(H.st.length>160)H.st.shift();H.i=H.st.length-1;autosave();refresh();if(typeof blAuto==='function')blAuto()}
+function commit(){normFloors();syncCore();const s=JSON.stringify(S);if(H.st[H.i]===s){refresh();return}H.st=H.st.slice(0,H.i+1);H.st.push(s);if(H.st.length>160)H.st.shift();H.i=H.st.length-1;autosave();refresh();if(typeof blAuto==='function')blAuto()}
 function undo(){if(H.i<=0)return;H.i--;S=JSON.parse(H.st[H.i]);afterLoad()}
 function redo(){if(H.i>=H.st.length-1)return;H.i++;S=JSON.parse(H.st[H.i]);afterLoad()}
 function afterLoad(){if(sel&&!byId(sel.kind,sel.id))sel=null;cancelOps();$('#pname').value=S.name||'';autosave();refresh()}
@@ -2344,6 +2505,7 @@ function render(c,W,H,v,dp,o){
  if(PREF.grid&&!ex)drawGrid(c,W,H,v);
  if(BG&&BG.img&&BG.vis&&!ex){TW();c.globalAlpha=BG.op;c.drawImage(BG.img,BG.x,BG.y,BG.w,BG.w*BG.img.naturalHeight/BG.img.naturalWidth);c.globalAlpha=1}
  TW();
+ drawGhost(c,ex);
  for(const r of S.rooms){if(r.pts.length<3)continue;c.beginPath();r.pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath();c.fillStyle=floorFill(c,r);c.fill()}
  for(const it of S.items)if(it.type==='rug'||it.type==='pool')drawItem(c,it,px);
  for(const w of S.walls){const s=!ex&&isSel('wall',w.id);c.fillStyle=s?'#2f7de1':'#2c3035';for(const [a,b] of wallPieces(w)){quad(c,w,a,b);c.fill()}}
@@ -2631,10 +2793,12 @@ function renderProps(){const P=$('#pProps');const o=selObj();if(!o){P.innerHTML=
   <button class="btn danger full" data-a="delRoomAll" style="margin-top:10px">🗑 Xoá nguyên phòng (sàn, tường riêng, cửa, đồ)</button>`}
  else if(k==='text'){h=`<h3>Ghi chú</h3><label class="fld"><span>Nội dung</span><textarea class="inp" rows="3" data-f="text">${esc(o.text)}</textarea></label>${num('Cỡ chữ','size',o.size||30)}<label class="fld"><span>Màu</span>${swatches(o.color||'#2a2e33','color',['#2a2e33','#c0392b','#2f7de1','#2e8b57','#e8692c','#8e44ad'])}</label>`}
  else if(k==='dim'){h=`<h3>Đường kích thước</h3><div class="info"><b>${fmtLen(dimPts(o).L)}</b></div>${num('Khoảng cách lệch','off',o.off||0)}`}
+ h+=syncRowHTML(k,o);
  h+=k==='room'?`<button class="btn full" data-a="delFloor" style="margin-top:8px">Chỉ xoá sàn & tên phòng (giữ tường)</button>`:`<button class="btn danger full" data-a="del" style="margin-top:12px">🗑 Xoá</button>`;
  P.innerHTML=h;
  const th=P.querySelector('#pthumb');if(th)thumb(th,o.type,o);
  P.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>ACT[b.dataset.a]());
+ {const sy=P.querySelector('[data-sy]');if(sy)sy.onchange=()=>{o.sy=sy.checked?1:0;commit()}}
  P.querySelectorAll('[data-f]').forEach(el=>{el.oninput=()=>{setField(o,el.dataset.f,el.value);P.querySelectorAll(`[data-f="${el.dataset.f}"]`).forEach(x=>{if(x!==el&&x.type!=='color')x.value=el.value});req()};el.onchange=()=>{commit()}});
  P.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{setField(o,b.dataset.swf,b.dataset.sw);commit()});
  P.querySelectorAll('[data-otype]').forEach(b=>b.onclick=()=>{o.type=b.dataset.otype;const T=(o.kind==='door'?DOORS:WINS)[o.type];o.w=T.w;const g=og(o);if(g)clampOpenings(g.w);commit()});
@@ -2680,7 +2844,7 @@ $('#bPanel').onclick=()=>$('#side').classList.toggle('open');
 $('#bAI').onclick=()=>{if(isMobile()&&curTab==='ai'&&$('#side').classList.contains('open')){$('#side').classList.remove('open');return}openTab('ai',true);if(!isMobile())$('#aiIn').focus()};
 $('#eRoom').onclick=()=>setTool('room');$('#eTpl').onclick=()=>$('#bTpl').click();$('#eAI').onclick=()=>$('#bAI').click();
 
-function refresh(){updUndo();renderProps();renderCtx();updEmpty();req()}
+function refresh(){normFloors();renderFloors();updUndo();renderProps();renderCtx();updEmpty();req()}
 function updEmpty(){$('#empty').hidden=!!(S.walls.length||S.rooms.length||S.items.length||S.texts.length||BG)||tool!=='select'}
 
 /* ================= Menu, hộp thoại ================= */
@@ -2735,7 +2899,8 @@ $('#bHelp').onclick=()=>modal(`<h3>Hướng dẫn nhanh</h3><ul class="tips" sty
  <li><b>🪄 Tự chỉnh</b>: làm thẳng tường bị xéo, khớp các điểm lệch vài cm, gộp tường trùng; trong menu này còn có xoay toàn bộ mặt bằng và tự bố trí nội thất.</li>
  <li><b>Phòng</b>: chọn phòng → nút ⟳ Xoay để xoay nguyên phòng (tường, cửa, đồ), 🛋 Bố trí để tự đặt nội thất theo loại phòng, 🗑 để xoá nguyên phòng.</li>
  <li><b>Nội thất từ ảnh</b>: tab Nội thất → “＋ Thêm từ ảnh”, chọn ảnh nhìn từ trên xuống, app tự tách nền và lấy đường viền; khi dựng 3D, Blender dùng lại ảnh đó.</li>
- <li><b>Lệnh nhanh trong khung AI</b> (không cần API): “xoay phòng ngủ 1 90 độ và bố trí lại nội thất”, “thêm cửa giữa Bếp và Phòng khách”, “thêm phòng tắm 2x2.5”, “xoá phòng kho”, “tự chỉnh”.</li>
+ <li><b>Nhiều tầng</b>: bấm <b>＋ Lầu</b> hoặc <b>＋ Hầm</b> ở góc trái bản vẽ. Tầng mới tự giữ nguyên <b>khung tường ngoài, cầu thang, thang máy</b> của tầng kề bên và luôn đồng bộ — sửa ở tầng nào các tầng khác tự theo (bỏ tích “Giữ nguyên ở mọi tầng” trong Thuộc tính nếu muốn riêng một món). Bấm lại tên tầng đang chọn để đổi tên, chỉnh chiều cao, xoá tầng. Lệnh nhanh: “thêm 2 lầu”, “thêm tầng hầm”, “sang lầu 1”. Dựng 3D có mục <b>Tầng hiển thị</b> (cả nhà / từng tầng / tách tầng).</li>
+    <li><b>Lệnh nhanh trong khung AI</b> (không cần API): “xoay phòng ngủ 1 90 độ và bố trí lại nội thất”, “thêm cửa giữa Bếp và Phòng khách”, “thêm phòng tắm 2x2.5”, “xoá phòng kho”, “tự chỉnh”.</li>
  <li><b>3D / Blender</b>: bấm nút 🧊 để dựng 3D trong Blender (tường, cửa, sàn gỗ/gạch, nội thất, đèn, bầu trời) và render ảnh. Cài addon một lần để gửi & render ngay từ app, hoặc tải script .py chạy trong Blender.</li>
  <li><b>Ảnh nền</b>: tải ảnh bản vẽ cũ lên để đồ lại, dùng “Hiệu chỉnh tỉ lệ” để khớp mét thật.</li>
  <li><b>AI</b>: nhập yêu cầu bằng tiếng Việt, AI sẽ tự vẽ / bố trí. Hỗ trợ Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq và AI chạy trên máy (Ollama, LM Studio).</li>
@@ -2767,7 +2932,7 @@ function mdModal(){const md=planMD();modal(`<h3>Mô tả Markdown</h3><textarea 
 function numv(v,d){const n=parseFloat(v);return isFinite(n)?n:d}
 function doAction(a){if(!a||typeof a!=='object')return false;const act=String(a.action||a.type_action||'').toLowerCase();
  switch(act){
-  case 'clear':S=Object.assign(blank(),{name:S.name,pid:S.pid,seq:S.seq});return true;
+  case 'clear':S=Object.assign(blank(),{name:S.name,pid:S.pid,seq:S.seq,fl:S.fl,cf:S.cf,sync:S.sync});return true;
   case 'outline':{const x=numv(a.x,0),y=numv(a.y,0),w=numv(a.w,0),h=numv(a.h,0),t=numv(a.t,20);if(w<10||h<10)throw new Error('kích thước không hợp lệ');[[x,y,x+w,y],[x+w,y,x+w,y+h],[x+w,y+h,x,y+h],[x,y+h,x,y]].forEach(e=>addWallDedupe(...e,t));return true}
   case 'add_room':{let pts=a.points||a.pts;if(!Array.isArray(pts)){const x=numv(a.x,0),y=numv(a.y,0),w=numv(a.w,0),h=numv(a.h,0);if(w<10||h<10)throw new Error('phòng quá nhỏ');pts=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]}if(pts.length<3)throw new Error('cần ≥3 điểm');createRoom(pts.map(p=>Array.isArray(p)?p:[p.x,p.y]),a.name||uniqName('Phòng'),{t:numv(a.t,10),walls:a.walls!==false,color:a.color,floor:a.floor});return true}
   case 'add_wall':{addWallDedupe(numv(a.x1),numv(a.y1),numv(a.x2),numv(a.y2),numv(a.t,10));return true}
@@ -2913,9 +3078,9 @@ async function aiSend(){if(aiBusy)return;const text=$('#aiIn').value.trim();if(!
 const B3=Object.assign({view:'iso',light:'day',quality:'good',res:1920,labels:true,cutaway:false,ceiling:false,wall_color:'#f2efe9',url:'http://localhost:8765',auto:false},LS.get('mb_3d',{}));
 const b3save=()=>LS.set('mb_3d',B3);
 let b3last=null,b3busy=false,b3linked=false,b3timer=null,b3t0=0;
-const wallH=()=>S.walls.length?r1(S.walls[0].h||300):300;
-function b3opts(){return {view:B3.view,light:B3.light,quality:B3.quality,res:+B3.res,labels:!!B3.labels&&B3.view==='top',cutaway:!!B3.cutaway&&B3.view!=='eye',ceiling:B3.view==='eye'||!!B3.ceiling,wall_color:B3.wall_color,wall_h:wallH()}}
-function b3plan(){const u=usedUlib(),ul={};for(const id in u){const e=u[id];ul[id]={img:e.img,out:e.out,h:e.h,base:e.base,col:e.col,n:e.n}}return {name:S.name,walls:S.walls,openings:S.openings,rooms:S.rooms,items:S.items,ulib:ul}}
+const wallH=()=>(S.fl&&S.fl.length>1&&curFl())?(curFl().h||300):(S.walls.length?r1(S.walls[0].h||300):300);
+function b3opts(){return {view:B3.view,light:B3.light,quality:B3.quality,res:+B3.res,labels:!!B3.labels&&B3.view==='top',cutaway:!!B3.cutaway&&B3.view!=='eye',ceiling:B3.view==='eye'||!!B3.ceiling,wall_color:B3.wall_color,wall_h:wallH(),floor_sel:(S.fl&&S.fl.length>1)?(B3.fsel||'all'):'all'}}
+function b3plan(){const u=usedUlib(),ul={};for(const id in u){const e=u[id];ul[id]={img:e.img,out:e.out,h:e.h,base:e.base,col:e.col,n:e.n}}const P={name:S.name,walls:S.walls,openings:S.openings,rooms:S.rooms,items:S.items,ulib:ul};if(S.fl&&S.fl.length>1)P.floors=flSorted().map(f=>{const d=flData(f);return {lv:f.lv,name:f.name,h:f.h||300,walls:d.walls,openings:d.openings,rooms:d.rooms,items:d.items}});return P}
 function pyCore(){return $('#pyCore').textContent.trim()}
 function makeScript(){return `# -*- coding: utf-8 -*-
 # "${(S.name||'Mat bang').replace(/[\r\n]/g,' ')}" — xuất từ Vẽ Mặt Bằng 2D
@@ -2938,7 +3103,7 @@ async function blCall(path,body){const u=B3.url.trim().replace(/\/+$/,'')+path;c
 function blErr(e){const m=String(e&&e.message||e);if(/Failed to fetch|NetworkError|Load failed/i.test(m))return 'Chưa kết nối được Blender. Kiểm tra: Blender đang mở, addon “Vẽ Mặt Bằng 2D – Liên kết” đã bật, địa chỉ đúng.'+(location.protocol==='https:'?' (Trang đang mở qua https — Safari có thể chặn gọi localhost, hãy dùng Chrome/Edge hoặc mở file .html trực tiếp.)':'');return m}
 function b3stat(t,cls){const el=$('#b3st');if(el){el.innerHTML=t;el.className=cls||''}}
 async function blPing(quiet){try{const j=await blCall('/ping');b3linked=true;b3stat('✓ Đã kết nối Blender '+esc(j.blender)+(j.busy?' — đang bận':''),'ok');return true}catch(e){b3linked=false;if(!quiet)b3stat(esc(blErr(e)),'bad');return false}}
-async function blSend(render){if(b3busy){toast('Blender đang xử lý, chờ chút…');return}if(!S.walls.length&&!S.rooms.length){toast('Bản vẽ đang trống');return}b3busy=true;b3t0=Date.now();const tick=setInterval(()=>{if(!b3busy){clearInterval(tick);return}b3stat(`<span class="spin"></span>${render?'Blender đang render':'Đang dựng cảnh'}… ${Math.round((Date.now()-b3t0)/1000)} giây`)},500);
+async function blSend(render){if(b3busy){toast('Blender đang xử lý, chờ chút…');return}if(!S.fl.some(f=>{const d=flData(f);return d.walls.length||d.rooms.length})){toast('Bản vẽ đang trống');return}b3busy=true;b3t0=Date.now();const tick=setInterval(()=>{if(!b3busy){clearInterval(tick);return}b3stat(`<span class="spin"></span>${render?'Blender đang render':'Đang dựng cảnh'}… ${Math.round((Date.now()-b3t0)/1000)} giây`)},500);
  try{const j=await blCall(render?'/render':'/build',{plan:b3plan(),opts:b3opts()});b3linked=true;const i=j.info||{};b3stat(`✓ ${render?'Render xong':'Đã dựng'} trong ${j.seconds} giây — ${i.walls} tường, ${i.rooms} phòng, ${i.items} đồ, ${i.lights} đèn`,'ok');if(render&&j.image){b3last=j.image;showRender()}}
  catch(e){b3stat('✗ '+esc(blErr(e)),'bad')}finally{b3busy=false;clearInterval(tick)}}
 function showRender(){const o=$('#b3out');if(!o||!b3last)return;o.innerHTML=`<img src="${b3last}" alt="Ảnh render"><div class="row" style="margin-top:8px"><button class="btn" id="b3dl">⬇ Tải ảnh render</button><button class="btn" id="b3big">⤢ Xem lớn</button></div>`;$('#b3dl').onclick=()=>dl(fname('png').replace(/\.png$/,'')+'-3d.png',b3last);$('#b3big').onclick=()=>{const w=window.open('','_blank');if(w){w.document.write(`<title>Render</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh"><img src="${b3last}" style="max-width:100%;max-height:100vh">`);w.document.close()}else toast('Trình duyệt chặn cửa sổ mới')}}
@@ -2948,6 +3113,7 @@ function modal3D(){const m=modal(`<div class="row" style="justify-content:space-
  <p class="muted" style="margin:0 0 14px">Blender sẽ dựng tường có lỗ cửa, cửa đi/cửa sổ có kính, sàn gỗ/gạch theo màu phòng, nội thất 3D, đèn trần từng phòng, mặt trời & bầu trời, rồi render bằng Cycles hoặc EEVEE.</p>
  <div class="b3cols"><div>
   <label class="fld"><span>Góc camera</span>${b3seg('view',[['top','Từ trên xuống'],['iso','Phối cảnh 3/4'],['eye','Ngang mắt']])}</label>
+  ${S.fl&&S.fl.length>1?`<label class="fld"><span>Tầng hiển thị</span>${b3seg('fsel',[['all','Cả nhà'],...flSorted().map(f=>[String(f.lv),f.name]),['explode','Tách tầng']])}</label>`:''}
   <label class="fld"><span>Ánh sáng</span>${b3seg('light',[['day','☀ Ban ngày'],['sunset','🌇 Hoàng hôn'],['night','🌙 Ban đêm']])}</label>
   <label class="fld"><span>Chất lượng</span>${b3seg('quality',[['draft','Nhanh (EEVEE)'],['good','Đẹp (Cycles)'],['best','Rất đẹp']])}</label>
   <label class="fld"><span>Chiều rộng ảnh</span>${b3seg('res',[[1280,'1280'],[1920,'1920'],[2560,'2K'],[3840,'4K']])}</label>
@@ -2973,20 +3139,135 @@ function modal3D(){const m=modal(`<div class="row" style="justify-content:space-
  m.querySelectorAll('[data-b3]').forEach(b=>b.onclick=()=>{const k=b.dataset.b3;B3[k]=k==='res'?+b.dataset.v:b.dataset.v;b3save();m.querySelectorAll(`[data-b3="${k}"]`).forEach(x=>x.classList.toggle('on',x===b))});
  m.querySelectorAll('[data-ck]').forEach(c=>c.onchange=()=>{B3[c.dataset.ck]=c.checked;b3save()});
  m.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{B3.wall_color=b.dataset.wc;b3save();m.querySelectorAll('[data-wc]').forEach(x=>x.classList.toggle('on',x===b))});
- $('#b3h').onchange=e=>{const v=clamp(parseFloat(e.target.value)||300,150,800);S.walls.forEach(w=>w.h=v);commit();toast('Đã đặt chiều cao '+v+' cm cho tất cả tường')};
+ $('#b3h').onchange=e=>{const v=clamp(parseFloat(e.target.value)||300,150,800);S.walls.forEach(w=>w.h=v);if(S.fl.length>1)curFl().h=v;commit();toast('Đã đặt chiều cao '+v+' cm cho tất cả tường')};
  $('#b3url').onchange=e=>{B3.url=e.target.value.trim()||'http://localhost:8765';b3save();blPing()};
  $('#b3addon').onclick=()=>{dlText('ve_mat_bang_2d_blender_addon.py',makeAddon());toast('Đã tải addon — cài trong Blender › Preferences › Add-ons',3500)};
- $('#b3py').onclick=()=>{if(!S.walls.length&&!S.rooms.length){toast('Bản vẽ đang trống');return}dlText(fname('py'),makeScript())};
+ $('#b3py').onclick=()=>{if(!S.fl.some(f=>{const d=flData(f);return d.walls.length||d.rooms.length})){toast('Bản vẽ đang trống');return}dlText(fname('py'),makeScript())};
  $('#b3ping').onclick=()=>{b3stat('<span class="spin"></span>Đang kiểm tra…');blPing()};
  $('#b3build').onclick=()=>blSend(false);$('#b3render').onclick=()=>blSend(true);
  if(b3busy)b3stat(`<span class="spin"></span>Blender đang xử lý…`);else blPing(true).then(ok=>{if(!ok)b3stat('Chưa kết nối — làm theo 3 bước ở trên.','muted')});
  showRender()}
 $('#b3D').onclick=modal3D;
 
+/* ================= Nhiều tầng (hầm / trệt / lầu) ================= */
+const CORE_T=new Set(['stairs','elevator']);
+const OUTDOOR_RE=/(^| )(san|vuon|ho boi|bai|garden|ho ca)( |$)/;
+const FKEYS=['walls','openings','rooms','items','texts','dims'];
+const flName=lv=>lv<0?(lv===-1?'Tầng hầm':'Hầm '+(-lv)):lv===0?'Tầng trệt':'Lầu '+lv;
+Object.assign(ALIAS,{"thang máy":"elevator","thang may":"elevator","lift":"elevator","elevator":"elevator","thang bộ":"stairs","cầu thang":"stairs"});
+if(PREF.ghost===undefined)PREF.ghost=true;
+function normFloors(){
+ if(!Array.isArray(S.fl)||!S.fl.length){S.fl=[{id:'f0',name:'Tầng trệt',lv:0,h:300,data:null}];S.cf='f0'}
+ if(!S.fl.some(f=>f.id===S.cf))S.cf=S.fl[0].id;
+ for(const f of S.fl){if(f.id===S.cf)f.data=null;else if(!f.data)f.data={walls:[],openings:[],rooms:[],items:[],texts:[],dims:[]}}
+ if(S.sync===undefined)S.sync=true}
+const curFl=()=>S.fl.find(f=>f.id===S.cf);
+const flSorted=()=>[...S.fl].sort((a,b)=>a.lv-b.lv);
+const flData=f=>f.id===S.cf?{walls:S.walls,openings:S.openings,rooms:S.rooms,items:S.items,texts:S.texts,dims:S.dims}:f.data;
+const allItems=()=>{normFloors();return S.fl.flatMap(f=>flData(f).items)};
+const clone=o=>JSON.parse(JSON.stringify(o));
+function stLbl(){if(!S.fl||S.fl.length<2)return 'LÊN';const s=flSorted(),i=s.findIndex(f=>f.id===S.cf);const up=i<s.length-1,down=i>0;return up&&down?'LÊN/XUỐNG':down?'XUỐNG':'LÊN'}
+
+/* --- nhận diện khung ngoài & vùng thang --- */
+function detectExt(){
+ const ind=S.rooms.filter(r=>r.pts.length>2&&!OUTDOOR_RE.test(norm(r.name)));const res=[];
+ if(ind.length){
+  for(const w of S.walls){if(wlen(w)<30)continue;const [ux,uy]=wdir(w),nx=-uy,ny=ux,o=w.t/2+10;let sc=0;
+   for(const f of [.25,.5,.75]){const px=w.x1+(w.x2-w.x1)*f,py=w.y1+(w.y2-w.y1)*f;const a=ind.some(r=>pip(px+nx*o,py+ny*o,r.pts)),b=ind.some(r=>pip(px-nx*o,py-ny*o,r.pts));if(a!==b)sc++}
+   if(sc>=2)res.push(w)}
+ }else if(S.walls.length){
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;for(const w of S.walls){x1=Math.min(x1,w.x1,w.x2);y1=Math.min(y1,w.y1,w.y2);x2=Math.max(x2,w.x1,w.x2);y2=Math.max(y2,w.y1,w.y2)}
+  for(const w of S.walls){const e=w.t+4;const hor=Math.abs(w.y1-w.y2)<3,ver=Math.abs(w.x1-w.x2)<3;
+   if((hor&&(Math.abs(w.y1-y1)<e||Math.abs(w.y1-y2)<e))||(ver&&(Math.abs(w.x1-x1)<e||Math.abs(w.x1-x2)<e)))res.push(w)}}
+ return res}
+function wallsOnRoom(r){return S.walls.filter(w=>[[w.x1,w.y1],[w.x2,w.y2],[(w.x1+w.x2)/2,(w.y1+w.y2)/2]].every(p=>onBoundary(p[0],p[1],r,12)))}
+function markFrame(){if(S.walls.some(w=>w.sy))return 0;const ws=detectExt();ws.forEach(w=>{if(w.sy===undefined)w.sy=1});return ws.length}
+function markCoreZones(){let n=0;
+ for(const it of S.items){if(!CORE_T.has(it.type)&&it.sy!==0&&/(^| )(thang may|elevator|lift)( |$)/.test(norm(it.label||''))){it.type='elevator';it.color='#dde2e6';delete it.label}}
+ for(const it of S.items){if(!CORE_T.has(it.type)||it.sy===0)continue;it.sy=1;
+  const rs=S.rooms.filter(r=>r.pts.length>2&&pip(it.x,it.y,r.pts)).sort((a,b)=>areaM2(a)-areaM2(b));
+  const r=rs.find(r=>!OUTDOOR_RE.test(norm(r.name)));
+  if(r&&(areaM2(r)<=2.2*(it.w*it.d/1e4)||/thang/.test(norm(r.name)))){if(r.sy===undefined){r.sy=1;n++}wallsOnRoom(r).forEach(w=>{if(w.sy===undefined)w.sy=1})}
+  else if(!S.rooms.some(q=>q.sy&&q.zone===it.id)){
+   const m=30,c=Math.cos(it.rot*D2R),s=Math.sin(it.rot*D2R),hw=it.w/2+m,hd=it.d/2+m;
+   const pts=[[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([lx,ly])=>[r1(it.x+lx*c-ly*s),r1(it.y+lx*s+ly*c)]);
+   S.rooms.push({id:nid('r'),name:it.type==='elevator'?'Giếng thang':'Lồng thang',pts,color:'#e8e1d6',floor:'tile',sy:1,zone:it.id});n++}}
+ return n}
+
+/* --- đồng bộ: khung ngoài + thang bộ + thang máy giữ nguyên ở mọi tầng --- */
+function syncCore(){
+ normFloors();if(S.fl.length<2||S.sync===false)return;
+ for(const it of S.items)if(CORE_T.has(it.type)&&it.sy===undefined)it.sy=1;
+ for(const r of S.rooms)if(r.sy===undefined&&/thang/.test(norm(r.name)))r.sy=1;
+ const src={walls:S.walls.filter(x=>x.sy),rooms:S.rooms.filter(x=>x.sy),items:S.items.filter(x=>x.sy)};
+ for(const f of S.fl){if(f.id===S.cf)continue;const d=f.data;
+  for(const k of ['walls','rooms','items'])d[k]=d[k].filter(x=>!x.sy).concat(src[k].map(clone));
+  const wid=new Set(d.walls.map(w=>w.id));d.openings=d.openings.filter(o=>wid.has(o.wall))}}
+
+/* --- chuyển / thêm / xoá tầng --- */
+function stashCur(){const c=curFl();c.data={walls:S.walls,openings:S.openings,rooms:S.rooms,items:S.items,texts:S.texts,dims:S.dims}}
+function switchFloor(id,quiet){normFloors();if(id===S.cf)return;const t=S.fl.find(f=>f.id===id);if(!t)return;stashCur();
+ for(const k of FKEYS)S[k]=t.data[k]||[];t.data=null;S.cf=id;sel=null;cancelOps();commit();if(!quiet)toast('Đang ở: '+t.name+(t.lv!==0?'':' (mặt đất)'))}
+function newFloorId(){return 'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)}
+function addFloor(dir,mode){normFloors();const sorted=flSorted();
+ const lv=dir>0?sorted[sorted.length-1].lv+1:sorted[0].lv-1;
+ const src=S.fl.find(f=>f.lv===(dir>0?lv-1:(lv===-1?0:lv+1)))||curFl();
+ if(src.id!==S.cf)switchFloor(src.id,true);
+ let nFrame=0,nCore=0;
+ if(mode!=='empty'){nFrame=markFrame();nCore=markCoreZones()}
+ const data={walls:[],openings:[],rooms:[],items:[],texts:[],dims:[]};
+ if(mode==='full'){for(const k of FKEYS)data[k]=clone(S[k])}
+ else if(mode==='core'){
+  data.walls=S.walls.filter(w=>w.sy).map(clone);data.rooms=S.rooms.filter(r=>r.sy).map(clone);data.items=S.items.filter(i=>i.sy).map(clone);
+  const wid=new Set(data.walls.map(w=>w.id));
+  data.openings=S.openings.filter(o=>wid.has(o.wall)&&o.type!=='main'&&o.type!=='garage'&&!(lv<0&&o.kind==='window')).map(o=>Object.assign(clone(o),{id:nid('o')}))}
+ const f={id:newFloorId(),name:flName(lv),lv,h:src.h||300,data};S.fl.push(f);
+ switchFloor(f.id,true);fit();
+ toast(mode==='empty'?'Đã tạo '+f.name+' (trống)':mode==='full'?'Đã nhân bản '+src.name+' thành '+f.name:`Đã tạo ${f.name}: giữ nguyên khung ngoài (${data.walls.length} tường) và ${data.items.length} thang`,3800)}
+async function delFloor(id){normFloors();if(S.fl.length<2){toast('Phải còn ít nhất một tầng');return}const f=S.fl.find(x=>x.id===id);if(!await confirmBox('Xoá “'+f.name+'” cùng toàn bộ bản vẽ của tầng này?'))return;
+ if(id===S.cf){const s=flSorted(),i=s.findIndex(x=>x.id===id);switchFloor((s[i-1]||s[i+1]).id,true)}
+ S.fl=S.fl.filter(x=>x.id!==id);commit();toast('Đã xoá '+f.name)}
+async function renameFloor(f){const v=await askText('Tên tầng','Tên hiển thị',f.name);if(v==null||!v.trim())return;f.name=v.trim().slice(0,24);commit()}
+async function heightFloor(f){const v=await askText('Chiều cao tầng','Cao từ sàn đến sàn tầng trên (cm)',String(f.h||300),'number');if(v==null)return;const n=clamp(parseFloat(v)||300,200,600);const old=f.h||300;f.h=n;
+ const d=flData(f);d.walls.forEach(w=>{if(!w.h||w.h===old)w.h=n});commit()}
+
+/* --- thanh chọn tầng --- */
+function renderFloors(){const el=$('#floors');if(!el)return;normFloors();const fl=flSorted().reverse();
+ el.innerHTML=`<button class="fb add" data-fa="1">＋ Lầu</button>`+fl.map(f=>`<button class="fb${f.id===S.cf?' on':''}" data-f="${f.id}" title="${esc(f.name)} — cao ${f.h||300} cm">${esc(f.name)}${f.id===S.cf?' ▾':''}</button>`).join('')+`<button class="fb add" data-fa="-1">＋ Hầm</button>`;
+ el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{if(b.dataset.f!==S.cf){switchFloor(b.dataset.f);return}floorMenu(b)});
+ el.querySelectorAll('[data-fa]').forEach(b=>b.onclick=()=>{const dir=+b.dataset.fa,nm=dir>0?'lầu':'tầng hầm';
+  showMenu(b,[{t:'Thêm '+nm+' — giữ khung ngoài + thang',sub:'Tường bao, cầu thang, thang máy lấy từ tầng kề bên',ic:'🏗',fn:()=>addFloor(dir,'core')},
+   {t:'Nhân bản nguyên '+(dir>0?'tầng trên cùng':'tầng trệt'),sub:'Sao chép cả phòng, đồ đạc để sửa tiếp',ic:'⧉',fn:()=>addFloor(dir,'full')},
+   {t:'Thêm '+nm+' trống',sub:'Không sao chép gì',ic:'▭',fn:()=>addFloor(dir,'empty')}])})}
+function floorMenu(btn){const f=curFl();
+ showMenu(btn,[{t:'Đổi tên tầng',ic:'✏',fn:()=>renameFloor(f)},
+  {t:'Chiều cao tầng: '+(f.h||300)+' cm',ic:'↕',fn:()=>heightFloor(f)},
+  '-',
+  {t:'Giữ khung ngoài + thang đồng bộ các tầng',sub:'Sửa ở tầng nào, các tầng khác tự theo',ck:()=>S.sync!==false,fn:()=>{S.sync=S.sync===false;commit()}},
+  {t:'Nhận lại khung ngoài + thang từ tầng này',sub:'Đánh dấu lại tường bao & vùng thang rồi đồng bộ',ic:'🔗',fn:()=>{S.walls.forEach(w=>{if(w.sy)delete w.sy});const a=markFrame(),b=markCoreZones();commit();toast(`Đã đánh dấu ${a} tường bao và ${b} vùng thang`)}},
+  {t:'Hiện mờ tầng kề bên khi vẽ',ck:()=>PREF.ghost!==false,fn:()=>{PREF.ghost=PREF.ghost===false;savePref();req()}},
+  '-',
+  {t:'Xoá tầng này',ic:'🗑',fn:()=>delFloor(f.id)}])}
+function drawGhost(c,ex){if(ex||PREF.ghost===false||!S.fl||S.fl.length<2)return;const s=flSorted(),i=s.findIndex(f=>f.id===S.cf);const g=s[i-1]||s[i+1];if(!g||!g.data)return;
+ c.save();c.globalAlpha=.2;c.fillStyle='#3d6a9a';for(const w of g.data.walls){quad(c,w,-w.t/2,wlen(w)+w.t/2);c.fill()}c.restore()}
+function syncRowHTML(k,o){if(!S.fl||S.fl.length<2||!['wall','item','room'].includes(k))return '';return `<label class="ck3" style="margin-top:10px"><input type="checkbox" data-sy ${o.sy?'checked':''}> 🔗 Giữ nguyên ở mọi tầng (khung ngoài / thang)</label>`}
+
+/* --- lệnh nhanh tiếng Việt --- */
+function localFloor(text){const n=norm(text).replace(/\s+/g,' ').trim();let m;
+ if(/(^| )(them|tao|lam|xay|mo)( .*)? ham( |$)/.test(n)&&!/(^| )(sang|vao|xem|ve|den)( |$)/.test(n)){addFloor(-1,/trong/.test(n)?'empty':'core');return {msg:'Đã thêm tầng hầm, giữ nguyên khung ngoài và thang bộ/thang máy.'}}
+ if((m=n.match(/(?:^| )(?:them|tao|lam|xay)\s+(\d{1,2})?\s*(?:tang lau|lau|tang)(?:\s+(\d{1,2}))?(?: |$)/))&&!/ham/.test(n)){
+  normFloors();const top=flSorted().pop().lv;let k=m[1]?+m[1]:1;if(m[2]&&!m[1])k=Math.max(1,+m[2]-top);k=Math.min(k,8);
+  const mode=/trong/.test(n)?'empty':/(nhan ban|giong|copy|sao chep)/.test(n)?'full':'core';for(let i=0;i<k;i++)addFloor(1,mode);
+  return {msg:`Đã thêm ${k} tầng lầu. Khung ngoài, cầu thang và thang máy được giữ nguyên ở mọi tầng; các phòng bên trong để trống cho bạn thiết kế.`}}
+ if((m=n.match(/(?:^| )(?:sang|vao|xem|den|chuyen|len|xuong|ve)(?: toi| den| lai| sang)?\s+(tang tret|tret|tang ham|ham|lau|tang)(?:\s*(\d{1,2}))?(?: |$)/))){
+  normFloors();const w=m[1],num=m[2]?+m[2]:null;const lv=/tret/.test(w)?0:/ham/.test(w)?-(num||1):w==='lau'?(num||1):(num||1)-1;
+  const f=S.fl.find(x=>x.lv===lv);if(!f)return {msg:'Chưa có tầng đó. Hãy nói “thêm lầu” hoặc “thêm tầng hầm” trước.',err:true};switchFloor(f.id,true);return {msg:'Đã chuyển sang '+f.name+'.'}}
+ return null}
+
 /* ================= Khởi động ================= */
 function init(){const saved=LS.get('mb_cur',null);if(saved&&Array.isArray(saved.walls))S=Object.assign(blank(),saved);$('#pname').value=S.name||'';const bg=LS.get('mb_bg',null);if(bg&&bg.src){const img=new Image();img.onload=()=>{BG={...bg,img};refresh()};img.src=bg.src}
  histReset();resize();aiUI();chatWelcome();renderOpts();$('#sHint').textContent=HINTS.select;refresh();requestAnimationFrame(()=>{resize();fit()});updStatus()}
-window.__mb={get S(){return S},V,applyActions,setTool,fit,hitTest,render,exportCanvas,planMD,parseAI,sysPrompt};
+window.__mb={get S(){return S},V,applyActions,setTool,fit,hitTest,render,exportCanvas,planMD,parseAI,sysPrompt,localCmd,b3plan,b3opts,switchFloor,addFloor,undo,redo};
 init();
 })();
 </script>
