@@ -163,6 +163,7 @@ kbd{background:var(--soft);border:1px solid var(--line);border-bottom-width:2px;
 .mbox.wide{width:min(980px,100%)}
 .lygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:2px}
 .lyc{display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:6px 6px 8px;border:1px solid #e3ded6;border-radius:12px;background:#fff;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.bkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .lyc:hover{border-color:#e8692c}.lyc.on{border-color:#e8692c;box-shadow:0 0 0 2px rgba(232,105,44,.25)}
 .lyc canvas{width:100%;height:auto;border-radius:8px;display:block}
 .lyc b{font-size:12.5px;line-height:1.25}.lyc small{font-size:11px;color:#6a7078}
@@ -510,6 +511,14 @@ def std_mats():
         'leaf': lambda: mat('leaf', hex2lin('#3f8a3a'), .7),
         'trunk': lambda: mat('trunk', hex2lin('#7a5230'), .8),
         'roofred': lambda: mat('roofred', hex2lin('#b9442b'), .5),
+        'redlac': lambda: mat('redlac', hex2lin('#b5452d'), .35),
+        'gravel': lambda: mat('gravel', hex2lin('#e8e3d6'), .95),
+        'cedar': lambda: mat('cedar', hex2lin('#c9935a'), .6),
+        'mapleleaf': lambda: mat('mapleleaf', hex2lin('#c2412d'), .7),
+        'pineleaf': lambda: mat('pineleaf', hex2lin('#2f5d3a'), .75),
+        'bamboo': lambda: mat('bamboo', hex2lin('#7fa650'), .5),
+        'court2': lambda: mat('court2', hex2lin('#2f6f4f'), .8),
+        'net': lambda: mat('net', hex2lin('#1c1d20'), .6, 0.0, 0.0, 0.0, 0.0, .45),
     }
 
 # ---------- bmesh helpers (toạ độ kiểu bản vẽ: x phải, y xuống; đổi sang Blender: y -> -y) ----------
@@ -634,6 +643,150 @@ def shelf(w, d, seed=1):
 def parts_for(t, w, d, H, seed=1, ctx=None):
     r = min(w, d) / 2
     ctx = ctx or {}
+    # ---- biệt thự / vườn Nhật / gym / sân thể thao ----
+    if t in ('supercar', 'roadster', 'hypercar'):
+        ps = [C(sx * w * .31, sy * (d / 2 - 14), 33, 33 if sx > 0 else 35, 33 if sx > 0 else 35, 28 if sx > 0 else 32, 'black', 'Y') for sx in (-1, 1) for sy in (-1, 1)]
+        ps += [B(0, 0, 14, w, d - 10, 34, 'main'), B(w * .38, 0, 12, w * .24, d - 30, 26, 'main'), B(-w * .42, 0, 18, w * .16, d - 8, 36, 'main')]
+        if t == 'roadster':
+            ps += [B(-w * .05, sy * d * .15, 44, w * .14, d * .22, 14, 'leather') for sy in (-1, 1)] + [B(w * .08, 0, 48, 3, d * .7, 22, 'tint')]
+        else:
+            ps += [B(-w * .03, 0, 48, w * .4, d * .66, 24, 'tint'), B(-w * .08, 0, 72, w * .26, d * .58, 3, 'main')]
+        ps += [B(-w * .47, 0, 54, w * .06, d * .8, 3, 'dark')]
+        return ps + [B(w / 2 - 2, sy * d * .33, 34, 3, 26, 5, 'lamp') for sy in (-1, 1)] + [B(-w / 2 + 1, sy * d * .33, 40, 2, 30, 4, 'red') for sy in (-1, 1)]
+    if t == 'carlift':
+        ps = [B(sx * (w / 2 - 10), sy * (d / 2 - 14), 0, 16, 16, 230, 'metal') for sx in (-1, 1) for sy in (-1, 1)]
+        ps += [B(0, sy * (d / 2 - 14), 222, w, 10, 10, 'metal') for sy in (-1, 1)]
+        return ps + [B(0, 0, 0, w - 36, d - 48, 12, 'metal')] + [B(sx * w * .22, 0, 12, 30, d - 70, 4, 'dark') for sx in (-1, 1)] + [B(0, d / 2 - 20, 12, w - 40, 6, 10, 'yellow')]
+    if t == 'turntable': return [C(0, 0, 0, r, r, 3, 'stone'), C(0, 0, 3, r - 12, r - 12, 2, 'metal')] + [B(0, 0, 5, (r - 20) * 2, 3, .4, 'dark', i * math.pi / 6) for i in range(6)]
+    if t == 'elevRound':
+        ps = [C(0, 0, 0, r, r, 4, 'metal'), C(0, 0, H - 10, r, r, 10, 'metal')]
+        ps += [C(math.cos(a) * (r - 3), math.sin(a) * (r - 3), 0, 3, 3, H, 'chrome') for a in [i * math.pi / 3 for i in range(6)]]
+        return ps + [C(0, 0, 4, r - 4, r - 4, H - 14, 'glass'), C(0, 0, 4, r - 18, r - 18, 4, 'stone'), B(0, r * .4, 100, r * .9, 3, 6, 'chrome')]
+    if t == 'spiral':
+        n = 16; ps = [C(0, 0, 0, 7, 7, H + 100, 'metal')]
+        for i in range(n):
+            a = -math.pi / 2 + i * (math.pi * 1.75 / n); zz = (i + 1) * H / n
+            ps.append(B(math.cos(a) * r * .55, math.sin(a) * r * .55, zz - 4, r * .9, r * .36, 4, 'main', a))
+            ps.append(C(math.cos(a) * (r - 4), math.sin(a) * (r - 4), zz, 1.4, 1.4, 92, 'metal'))
+        return ps
+    if t == 'grandpiano':
+        return [C(0, -d * .05, 0, w * .48, d * .45, 0.1, 'black')] + legs(w * .8, d * .8, 62, 4, 10, 'black') + [C(0, 0, 62, w / 2, d / 2, 30, 'black'), B(0, -d / 2 + 8, 62, w - 4, 16, 30, 'black'), B(0, -d / 2 - 8, 74, w - 14, 16, 3, 'white'), B(0, -d / 2 + 2, 92, w * .9, d * .7, 2, 'black', .0), B(0, -d / 2 - 40, 0, w * .55, 32, 48, 'black')]
+    if t == 'fireplace': return [B(0, 0, 0, w, d, 110, 'main'), B(0, d / 2 - 6, 15, w * .62, 4, 60, 'black'), B(0, 0, 110, w + 10, d + 6, 6, 'stone'), SP(0, d * .2, 24, 9, 'lamp'), SP(-12, d * .2, 22, 6, 'lamp'), SP(12, d * .2, 22, 6, 'lamp')]
+    if t == 'sofaCurve':
+        ps = []
+        for i in range(7):
+            a = (i - 3) * .23; x = math.sin(a) * w * .45; y = -math.cos(a) * d * .35 + d * .2
+            ps += [B(x, y, 0, w * .16, d * .62, 42, 'main', -a), B(x - math.sin(a) * d * .26, y - math.cos(a) * d * .22 * 0 - d * .24, 42, w * .16, 18, 38, 'main', -a)]
+        return ps
+    if t == 'tubFree': return [C(0, 0, 0, w / 2, d / 2, 58, 'white'), C(0, 0, 40, w / 2 - 8, d / 2 - 8, 18.5, 'water'), C(w / 2 + 6, 0, 0, 2, 2, 95, 'chrome')]
+    if t == 'sauna':
+        ps = [B(0, -d / 2 + 2, 0, w, 4, 210, 'cedar'), B(-w / 2 + 2, 0, 0, 4, d, 210, 'cedar'), B(w / 2 - 2, 0, 0, 4, d, 210, 'cedar'), B(0, 0, 210, w, d, 4, 'cedar'), B(-w * .25, d / 2 - 2, 0, w / 2, 4, 210, 'cedar'), B(w * .25, d / 2 - 2, 0, w * .5 - 4, 3, 200, 'glass')]
+        return ps + [B(0, -d / 2 + 30, 0, w - 10, 50, 45, 'cedar'), B(0, -d / 2 + 20, 45, w - 10, 30, 40, 'cedar'), B(w / 2 - 25, d / 2 - 30, 0, 30, 30, 60, 'dark')]
+    if t == 'closetIsl': return [B(0, 0, 0, w, d, 88, 'main'), B(0, 0, 88, w, d, 3, 'glass')] + [B(0, sy * (d / 2 + .3), z, w - 6, .7, .7, 'dark') for sy in (-1, 1) for z in (30, 60)]
+    if t == 'cellar':
+        ps = [B(0, 0, 0, w, d, 220, 'main')]
+        n = max(3, int(w // 14))
+        for k in range(8):
+            for i in range(n):
+                ps.append(C(-w / 2 + (i + .5) * w / n, d / 2 - 6, 20 + k * 24, 3.4, 3.4, 10, 'black' if (i + k) % 3 else 'green', 'Y'))
+        return ps
+    if t == 'cinema':
+        ps = []
+        for i in range(3):
+            x = -w / 2 + (i + .5) * w / 3; sw = w / 3
+            ps += [B(x, 0, 0, sw - 4, d, 42, 'main'), B(x, -d / 2 + 12, 42, sw - 4, 22, 58, 'main'), B(x - sw / 2 + 5, 6, 42, 8, d - 20, 22, 'dark'), B(x + sw / 2 - 5, 6, 42, 8, d - 20, 22, 'dark')]
+        return ps
+    if t == 'screen': return [B(0, 0, 60, w, 2, w * .5, 'white'), B(0, -2, 58, w + 10, 2, w * .5 + 4, 'black')]
+    if t == 'gymrack':
+        ps = [B(sx * (w / 2 - 8), sy * (d / 2 - 8), 0, 8, 8, 230, 'dark') for sx in (-1, 1) for sy in (-1, 1)]
+        ps += [B(0, sy * (d / 2 - 8), 226, w, 6, 6, 'dark') for sy in (-1, 1)] + [B(0, -d * .1, 130, w * .95, 3, 3, 'chrome')]
+        return ps + [C(sx * w * .42, -d * .1, 131.5, 22, 22, 6, 'black', 'Y') for sx in (-1, 1)] + [B(0, d * .2, 0, 32, d * .38, 45, 'leather')]
+    if t == 'wbench': return legs(w, d * .6, 40, 2.5, 8, 'metal') + [B(0, 0, 40, w, d * .55, 8, 'leather')]
+    if t == 'dumbbell':
+        ps = [B(0, 0, 0, w, d, 4, 'metal'), B(0, 0, 40, w, d, 3, 'metal'), B(0, 0, 80, w, d * .7, 3, 'metal')] + [B(sx * (w / 2 - 3), 0, 0, 4, d, 84, 'metal') for sx in (-1, 1)]
+        n = max(3, int(round(w / 26)))
+        return ps + [C(-w / 2 + (i + .5) * w / n, sy * d * .22, zz, 6, 6, 18, 'black', 'Y') for i in range(n) for sy in (-1, 1) for zz in (44, 4) if zz == 44 or i % 2 == 0]
+    if t == 'rower': return [B(0, 0, 10, w - 30, 10, 6, 'metal'), C(w / 2 - 26, 0, 32, 24, 24, 12, 'dark', 'Y'), B(-w * .1, 0, 18, 34, 28, 8, 'leather'), B(w / 2 - 55, 0, 0, 6, d - 8, 22, 'dark')]
+    if t == 'ellip': return [B(0, 0, 0, w, d * .7, 12, 'dark'), B(-w * .1, -d * .18, 30, w * .36, 14, 4, 'metal'), B(-w * .1, d * .18, 30, w * .36, 14, 4, 'metal'), B(w / 2 - 16, 0, 0, 14, 20, 140, 'dark'), B(w / 2 - 22, 0, 130, 10, d, 4, 'metal')]
+    if t == 'yoga': return [B(0, 0, 0, w, d, .6, 'main')]
+    if t == 'punch': return [C(0, 0, 70, r * .9, r * .9, 110, 'main'), C(0, 0, 180, 1, 1, 70, 'chrome')]
+    if t == 'ironing': return [B(0, 0, 0, w * .7, 4, 85, 'metal', .5), B(0, 0, 0, w * .7, 4, 85, 'metal', -.5), B(0, 0, 85, w, d, 3, 'main'), B(-w * .38, 0, 88, 22, 12, 12, 'blue')]
+    if t == 'clothesrack':
+        ps = [B(sx * (w / 2 - 3), 0, 0, 4, d, 4, 'metal') for sx in (-1, 1)] + [B(sx * (w / 2 - 3), 0, 0, 3, 3, 160, 'metal') for sx in (-1, 1)] + [B(0, 0, 158, w, 3, 3, 'metal')]
+        return ps + [B(-w / 2 + 14 + i * (w - 28) / 6, 0, 70, 6, d * .7, 85, ['pink', 'blue', 'yellow', 'green', 'white'][i % 5]) for i in range(7)]
+    if t == 'lsink': return [B(0, 0, 0, w, d, 85, 'white'), B(0, 2, 70, w - 12, d - 14, 16, 'water'), C(0, -d / 2 + 6, 85, 2, 2, 20, 'chrome')]
+    if t == 'toybox': return [B(0, 0, 0, w, d, 45, 'main'), B(0, 0, 45, w + 2, d + 2, 3, 'white'), SP(-w * .2, 0, 52, 6, 'pink'), SP(w * .2, 0, 52, 6, 'blue')]
+    if t == 'kidsbed': return [B(0, 0, 0, w, d, 30, 'main'), B(0, 0, 30, w - 8, d - 8, 16, 'white'), B(0, -d / 2 + 22, 46, w * .7, 30, 10, 'yellow'), B(0, -d / 2 + 3, 0, w, 6, 90, 'main'), B(w / 2 - 3, d * .05, 46, 4, d * .45, 18, 'main')]
+    if t == 'whiteboard': return [B(0, 0, 90, w, 3, 100, 'white'), B(0, 2, 88, w, 5, 3, 'metal')]
+    if t == 'kidstable':
+        rr_ = min(w, d) * .28; ps = [C(0, 0, 0, 3, 3, 48, 'metal'), C(0, 0, 48, rr_, rr_, 3, 'main')]
+        return ps + [B(math.cos(a) * (rr_ + 16), math.sin(a) * (rr_ + 16), 0, 22, 22, 30, k) for a, k in zip([0, math.pi / 2, math.pi, 3 * math.pi / 2], ['pink', 'blue', 'green', 'yellow'])]
+    if t == 'firepit': return [C(0, 0, 0, r, r, 35, 'stone'), C(0, 0, 35, r * .68, r * .68, .5, 'black'), SP(0, 0, 40, r * .18, 'lamp'), SP(-r * .2, r * .1, 38, r * .12, 'lamp')]
+    if t == 'outsofa': return sofa(w, d)
+    if t == 'koi':
+        ps = [C(0, 0, 0, w * .46, d * .45, 6, 'stone'), C(0, 0, 6, w * .41, d * .4, .6, 'water')]
+        for i in range(14):
+            a = i / 14 * 2 * math.pi; ps.append(SP(math.cos(a) * w * .44, math.sin(a) * d * .43, 6, 13 + (i % 3) * 4, 'stone'))
+        for x, y, rr2 in ((-w * .22, -d * .12, 20), (-w * .12, d * .18, 16), (w * .2, d * .15, 22), (w * .28, -d * .2, 15)): ps.append(C(x, y, 6.8, rr2, rr2, .5, 'green'))
+        for x, y in ((-w * .08, d * .22), (w * .12, d * .22)): ps.append(SP(x, y, 9, 6, 'pink'))
+        for x, y in ((w * .02, -d * .05), (-w * .25, d * .05), (w * .15, -d * .25)): ps.append(B(x, y, 5.6, 22, 8, 1.2, 'fruit', .4))
+        return ps
+    if t == 'stream':
+        ps = []; n = 16
+        for i in range(n):
+            x = -w / 2 + (i + .5) * w / n; y = math.sin((i + .5) / n * math.pi * 2.2) * d * .22
+            ps.append(B(x, y, 0, w / n + 6, d * .5, 2, 'stone', math.cos((i + .5) / n * math.pi * 2.2) * .5))
+            ps.append(B(x, y, 2, w / n + 6, d * .36, .6, 'water', math.cos((i + .5) / n * math.pi * 2.2) * .5))
+            ps.append(SP(x, y + (1 if i % 2 else -1) * d * .32, 2, 8 + (i % 3) * 3, 'stone'))
+        return ps
+    if t == 'onsen':
+        ps = [C(0, 0, 0, w * .48, d * .47, 10, 'stone'), C(0, 0, 10, w * .4, d * .38, .6, 'water')]
+        for i in range(18):
+            a = i / 18 * 2 * math.pi; ps.append(SP(math.cos(a) * w * .44, math.sin(a) * d * .43, 12, 14 + (i % 3) * 5, 'stone'))
+        return ps + [SP(w * .3, -d * .28, 20, 26, 'stone')]
+    if t == 'waterfall':
+        ps = [B(0, -d * .3, 0, w, d * .4, 120, 'stone')] + [SP(x, -d * .2, 120, 28, 'stone') for x in (-w * .35, -w * .1, w * .2, w * .38)]
+        return ps + [B(0, -d * .08, 4, w * .36, 4, 112, 'water'), C(0, d * .2, 0, w * .25, d * .3, 1, 'water')]
+    if t == 'zen':
+        ps = [B(0, 0, 0, w, d, 3, 'gravel')] + [B(0, -d / 2 + 6 + i * 10, 3, w - 8, 2, .4, 'stone') for i in range(int((d - 12) // 10))]
+        return ps + [SP(-w * .25, -d * .1, 6, 26, 'stone'), SP(w * .18, d * .12, 4, 20, 'stone'), SP(w * .3, -d * .25, 4, 14, 'stone')]
+    if t == 'lantern': return [B(0, 0, 0, w, d, 12, 'stone'), C(0, 0, 12, 6, 6, 50, 'stone'), B(0, 0, 62, w * .8, d * .8, 22, 'stone'), B(0, 0, 66, w * .5, d * .5, 14, 'lamp'), B(0, 0, 84, w * 1.15, d * 1.15, 6, 'stone'), SP(0, 0, 94, 7, 'stone')]
+    if t == 'pine':
+        ps = [B(0, 0, 0, 14, 14, 120, 'trunk', .3), B(-w * .15, d * .12, 80, 12, 12, 90, 'trunk', -.6), B(w * .15, -d * .1, 110, 12, 12, 80, 'trunk', .8)]
+        return ps + [SP(-w * .3, d * .22, 150, w * .16, 'pineleaf'), SP(w * .3, -d * .22, 180, w * .15, 'pineleaf'), SP(-w * .1, -d * .3, 220, w * .13, 'pineleaf'), SP(w * .08, d * .05, 245, w * .12, 'pineleaf')]
+    if t == 'maple':
+        return [C(0, 0, 0, 10, 10, 170, 'trunk')] + [SP(math.cos(i * 2.1) * r * .45, math.sin(i * 2.1) * r * .45, 220 + (i % 3) * 25, r * .5, 'mapleleaf') for i in range(5)] + [SP(0, 0, 270, r * .55, 'mapleleaf')]
+    if t == 'bamboo':
+        n = max(4, int(round(w / 18))); ps = []
+        for i in range(n):
+            x = -w / 2 + (i + .5) * w / n; y = ((i * 37) % 10 - 5) / 10 * d * .4; hh = 380 + (i * 53) % 120
+            ps += [C(x, y, 0, 3.2, 3.2, hh, 'bamboo'), SP(x, y, hh, 26, 'leaf')]
+        return ps
+    if t == 'bridgeJ':
+        ps = []
+        for i in range(9):
+            x = -w / 2 + (i + .5) * w / 9; zz = 18 + 30 * math.sin((i + .5) / 9 * math.pi)
+            ps.append(B(x, 0, zz, w / 9 + 2, d - 20, 5, 'woodl'))
+            for sy in (-1, 1): ps += [B(x, sy * (d / 2 - 5), zz, 5, 5, 70, 'redlac'), B(x, sy * (d / 2 - 5), zz + 66, w / 9 + 3, 6, 5, 'redlac')]
+        return ps
+    if t == 'tsukubai': return [C(0, 0, 0, r, r, 40, 'stone'), C(0, 0, 40, r * .5, r * .5, .6, 'water'), B(r * .8, -r * .8, 46, r * 1.2, 5, 5, 'bamboo', -.785)]
+    if t == 'rock': return [SP(0, 0, 0, min(w, d) * .5, 'stone'), SP(w * .25, d * .1, 0, min(w, d) * .3, 'stone')]
+    if t in ('pickle', 'tennis'):
+        ps = [B(0, 0, 0, w + 300, d + 300, 1, 'court2'), B(0, 0, 1, w, d, .6, 'main')]
+        lw_ = 5
+        ps += [B(0, sy * (d / 2 - 2.5), 1.6, w, lw_, .3, 'white') for sy in (-1, 1)] + [B(sx * (w / 2 - 2.5), 0, 1.6, lw_, d, .3, 'white') for sx in (-1, 1)]
+        if t == 'pickle':
+            ps += [B(sx * 213, 0, 1.6, lw_, d, .3, 'white') for sx in (-1, 1)] + [B(sx * (213 + (w / 2 - 213) / 2), 0, 1.6, w / 2 - 213, lw_, .3, 'white') for sx in (-1, 1)]
+            netH = 91
+        else:
+            s = d * .125
+            ps += [B(0, sy * (d / 2 - s), 1.6, w, lw_, .3, 'white') for sy in (-1, 1)] + [B(sx * w * .27, 0, 1.6, lw_, d - 2 * s, .3, 'white') for sx in (-1, 1)] + [B(0, 0, 1.6, w * .54, lw_, .3, 'white')]
+            netH = 107
+        return ps + [B(0, 0, 0, 3, d + 60, netH, 'net'), B(0, 0, netH - 4, 4, d + 60, 5, 'white')] + [C(0, sy * (d / 2 + 30), 0, 4, 4, netH + 4, 'metal') for sy in (-1, 1)]
+    if t == 'golf':
+        ps = [C(0, 0, 0, w * .46, d * .45, 2, 'grass'), C(w * .3, d * .18, 0, w * .1, d * .12, 2.6, 'sand')]
+        for x, y in ((-w * .25, -d * .1), (w * .1, -d * .2), (w * .05, d * .22)): ps += [C(x, y, 0, 1, 1, 120, 'white'), B(x + 9, y, 108, 18, 1, 12, 'red')]
+        return ps
     if t == 'elevator':
         th = 6; dw = w * .56; fl = (w - dw) / 2
         ps = [B(0, -d / 2 + th / 2, 0, w, th, H, 'metal'), B(-w / 2 + th / 2, 0, 0, th, d, H, 'metal'), B(w / 2 - th / 2, 0, 0, th, d, H, 'metal')]
@@ -1011,7 +1164,7 @@ def _mesh_obj(coll, name, bm, mats):
 
 # ---------- nhiều tầng ----------
 SLAB = 20.0
-_OUT_WORDS = ('san', 'vuon', 'ho boi', 'bai ', 'garden', 'ho ca', 'pool')
+_OUT_WORDS = ('san', 'vuon', 'ho boi', 'bai ', 'garden', 'ho ca', 'pool', 'onsen', 'ngoai troi', 'pickleball', 'tennis', 'ban cong')
 
 def _is_out(name):
     import unicodedata
@@ -1282,6 +1435,7 @@ def _build_one(plan, opts=None):
     wpm = {'day': 6, 'sunset': 18, 'night': 28}.get(light, 9) * float(opts.get('lamp_power', 1.0))
     lcol = (1.0, .93, .84) if light == 'day' else (1.0, .82, .62)
     for r in (rooms if geom else []):
+        if _is_out(r.get('name', '')) and light == 'day': continue  # ngoài trời ban ngày: không cần đèn trần
         pts = r['pts']; xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
         a = 0
         for i in range(len(pts)):
@@ -2405,7 +2559,7 @@ function addDoorFor(rA,rB,kind){kind=kind||'door';const ow=kind==='door'?(rtype(
  else{const inner=segs.filter(g=>{const [A,B]=segSide(g.w,(g.s0+g.s1)/2);return A&&B});if(inner.length)segs=inner}
  segs.sort((a,b)=>(b.s1-b.s0)-(a.s1-a.s0));
  for(const g of segs){let ww=ow;let p=freeSpot(g.w,ww,g.s0,g.s1);if(p==null&&kind==='window'){ww=60;p=freeSpot(g.w,ww,g.s0,g.s1)}if(p==null)continue;const [ux,uy]=wdir(g.w);const o=placeOpening(kind,kind==='door'?'single':(ww<100?'small':'win'),g.w.x1+ux*p,g.w.y1+uy*p,ww,3);if(o)return o}return null}
-function localCmd(text){const rl=localLayout(text);if(rl)return rl;const rf=localFloor(text);if(rf)return rf;const r0=localCmd0(text);if(r0)return r0;return localFurn(text)}
+function localCmd(text){const rl=localLayout(text);if(rl)return rl;const rf=localFloor(text);if(rf)return rf;const rb=localBlock(text);if(rb)return rb;const r0=localCmd0(text);if(r0)return r0;return localFurn(text)}
 /* lệnh nhanh: "thêm cầu tuột", "đặt 2 ghế nằm hồ bơi vào sân", "thêm xe máy vào gara" */
 function localFurn(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!/(^| )(them|dat|bo tri|cho|ve|tao|lap|sam)( |$)/.test(n))return null;
  let best=null,bl=0;const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -2928,7 +3082,7 @@ $('#bFile').onclick=e=>showMenu(e.currentTarget,[
  {t:'Mở dự án đã lưu…',ic:'📂',fn:projectsModal},'-',
  {t:'Mở file .json…',ic:'⬆',fn:()=>$('#fJson').click()},
  {t:'Tải file .json',ic:'⬇',fn:downloadJSON}]);
-$('#bTpl').onclick=e=>showMenu(e.currentTarget,TPL.map(t=>({t:t.n,sub:t.d,ic:t.ic,fn:()=>loadTemplate(t)})));
+$('#bTpl').onclick=e=>showMenu(e.currentTarget,TPL.map(t=>({t:t.n,sub:t.d,ic:t.ic,fn:()=>loadTemplate(t)})).concat(['-',{t:'Chèn phòng mẫu vào bản vẽ…',sub:'Master + WC, gym, rạp phim, vườn Nhật, onsen, pickleball…',ic:'➕',fn:()=>modalBlocks()}]));
 $('#bHelp').onclick=()=>modal(`<h3>Hướng dẫn nhanh</h3><ul class="tips" style="color:var(--ink);font-size:13.5px">
  <li><b>Phòng</b>: kéo một hình chữ nhật → tự xây 4 bức tường. Vẽ phòng sát nhau, tường chung tự gộp. Chọn loại phòng (khách, ngủ, bếp…) trên thanh trên cùng.</li>
  <li><b>Tường</b>: nhấn từng điểm để vẽ nối tiếp; nhập số đo vào ô “Dài” rồi bấm hướng →↓←↑ để vẽ chính xác. Khép kín sẽ tự thành phòng.</li>
@@ -2938,7 +3092,8 @@ $('#bHelp').onclick=()=>modal(`<h3>Hướng dẫn nhanh</h3><ul class="tips" sty
  <li><b>🪄 Tự chỉnh</b>: làm thẳng tường bị xéo, khớp các điểm lệch vài cm, gộp tường trùng; trong menu này còn có xoay toàn bộ mặt bằng và tự bố trí nội thất.</li>
  <li><b>Phòng</b>: chọn phòng → nút ⟳ Xoay để xoay nguyên phòng (tường, cửa, đồ), 🛋 Bố trí để tự đặt nội thất theo loại phòng, 🗑 để xoá nguyên phòng.</li>
  <li><b>Nội thất từ ảnh</b>: tab Nội thất → “＋ Thêm từ ảnh”, chọn ảnh nhìn từ trên xuống, app tự tách nền và lấy đường viền; khi dựng 3D, Blender dùng lại ảnh đó.</li>
- <li><b>Tường cong</b>: chọn tường rồi kéo <b>hình thoi cam</b> ở giữa để uốn, hoặc dùng nút “◠ Uốn” / ô “Độ cong”. Khi vẽ tường, bật <b>◠ Tường cong</b> để mỗi đoạn vừa vẽ được uốn ngay (rê để chỉnh, nhấn để chốt). Cửa, cửa sổ đặt được trên tường cong; Blender dựng thành tường cong thật.</li>
+ <li><b>Biệt thự & siêu biệt thự</b>: menu <b>Mẫu</b> có “Biệt thự 2 tầng” và “Siêu biệt thự 3 tầng + hầm” dựng sẵn đủ tầng. Mục <b>Mẫu → Chèn phòng mẫu</b> thêm nhanh phòng có sẵn tường, cửa, nội thất: master + WC + thay đồ, phòng ngủ có WC riêng, phòng ngủ khách, phòng trẻ em, phòng học cho bé, làm việc, gym, xem phim, giặt ủi, spa xông hơi, hầm rượu, garage siêu xe thang nâng, ăn ngoài trời, ban công sân vườn, sân pickleball, vườn Nhật khe suối + hồ sen cá koi, hồ tắm onsen. Lệnh nhanh: “thêm phòng gym”, “thêm phòng ngủ có wc riêng”, “thêm vườn nhật”… Thư viện nội thất có thêm nhóm <b>Cao cấp & biệt thự</b>, <b>Vườn Nhật & thủy cảnh</b>, <b>Gym & giải trí</b>, <b>Sân thể thao</b>.</li>
+    <li><b>Tường cong</b>: chọn tường rồi kéo <b>hình thoi cam</b> ở giữa để uốn, hoặc dùng nút “◠ Uốn” / ô “Độ cong”. Khi vẽ tường, bật <b>◠ Tường cong</b> để mỗi đoạn vừa vẽ được uốn ngay (rê để chỉnh, nhấn để chốt). Cửa, cửa sổ đặt được trên tường cong; Blender dựng thành tường cong thật.</li>
     <li><b>Bố trí nội thất nhiều kiểu</b>: chọn phòng → <b>🛋 Bố trí</b> mở bảng các phương án (mỗi loại phòng có nhiều mẫu: giường giữa tường, giường + bàn học, sofa L, bếp chữ I/L/U/song song/đảo…), mỗi mẫu được thử theo cả 4 hướng và tự né cửa đi, cửa sổ. <b>🔀 Kiểu khác</b> đổi nhanh sang phương án kế tiếp. Lệnh nhanh: “bố trí kiểu khác”, “bố trí kiểu 3 cho phòng ngủ 1”.</li>
     <li><b>Nhiều tầng</b>: bấm <b>＋ Lầu</b> hoặc <b>＋ Hầm</b> ở góc trái bản vẽ. Tầng mới tự giữ nguyên <b>khung tường ngoài, cầu thang, thang máy</b> của tầng kề bên và luôn đồng bộ — sửa ở tầng nào các tầng khác tự theo (bỏ tích “Giữ nguyên ở mọi tầng” trong Thuộc tính nếu muốn riêng một món). Bấm lại tên tầng đang chọn để đổi tên, chỉnh chiều cao, xoá tầng. Lệnh nhanh: “thêm 2 lầu”, “thêm tầng hầm”, “sang lầu 1”. Dựng 3D có mục <b>Tầng hiển thị</b> (cả nhà / từng tầng / tách tầng).</li>
     <li><b>Lệnh nhanh trong khung AI</b> (không cần API): “xoay phòng ngủ 1 90 độ và bố trí lại nội thất”, “thêm cửa giữa Bếp và Phòng khách”, “thêm phòng tắm 2x2.5”, “xoá phòng kho”, “tự chỉnh”.</li>
@@ -3199,7 +3354,7 @@ $('#b3D').onclick=modal3D;
 
 /* ================= Nhiều tầng (hầm / trệt / lầu) ================= */
 const CORE_T=new Set(['stairs','elevator']);
-const OUTDOOR_RE=/(^| )(san|vuon|ho boi|bai|garden|ho ca)( |$)/;
+const OUTDOOR_RE=/(^| )(san|vuon|ho boi|bai|garden|ho ca|ban cong|ngoai troi|onsen)( |$)/;
 const FKEYS=['walls','openings','rooms','items','texts','dims'];
 const flName=lv=>lv<0?(lv===-1?'Tầng hầm':'Hầm '+(-lv)):lv===0?'Tầng trệt':'Lầu '+lv;
 Object.assign(ALIAS,{"thang máy":"elevator","thang may":"elevator","lift":"elevator","elevator":"elevator","thang bộ":"stairs","cầu thang":"stairs"});
@@ -3341,7 +3496,7 @@ function mkCtx(fr,B,k,m,ops,fixed,A){
  C.fits=(u,v,hw,hd,solid,o={})=>{if(u-hw<-1||u+hw>W+1||v-hd<-1||v+hd>D+1)return false;
   for(const [a,c] of [[0,0],[-hw+2,-hd+2],[hw-2,-hd+2],[hw-2,hd-2],[-hw+2,hd-2]]){const [x,y]=T(u+a,v+c);if(!pip(x,y,LP))return false}
   if(!solid)return true;
-  for(const q of C.items)if(q.solid&&u-hw<q.u+q.hw-2&&u+hw>q.u-q.hw+2&&v-hd<q.v+q.hd-2&&v+hd>q.v-q.hd+2)return false;
+  for(const q of C.items)if(q.solid&&q!==o.ign&&u-hw<q.u+q.hw-2&&u+hw>q.u-q.hw+2&&v-hd<q.v+q.hd-2&&v+hd>q.v-q.hd+2)return false;
   for(const q of C.fixed)if(u-hw<q.x2-2&&u+hw>q.x1+2&&v-hd<q.y2-2&&v+hd>q.y1+2)return false;
   if(!o.noDoor)for(const z of C.doors){if(!z.r)continue;const nx=clamp(z.u,u-hw,u+hw),ny=clamp(z.v,v-hd,v+hd);if(hyp(nx-z.u,ny-z.v)<z.r)return false}
   return true};
@@ -3382,7 +3537,7 @@ function scoreCtx(C,L,t){let s=(L.pr||0)-C.miss*6,sw=0;const along=z=>z.side==='
  return s+Math.min(sw,LCAP[t]||3)+sw*.02}
 /* --- thư viện mẫu theo loại phòng --- */
 const kitTop=(C,ct,cw)=>{if(!ct)return;C.rel(ct,'sinkK',-cw/2+50,0,0,{solid:false,wt:.3});C.rel(ct,'stove',cw/2-45,0,0,{solid:false,wt:.3})};
-const chairAt=(C,dk)=>dk&&(C.front(dk,'ochair',-22,{wt:.5})||C.front(dk,'chair',-15,{wt:.4}));
+const chairAt=(C,dk)=>dk&&(C.front(dk,'ochair',-22,{wt:.5,ign:dk})||C.front(dk,'chair',-15,{wt:.4,ign:dk})||C.front(dk,'ochair',2,{wt:.4}));
 const LAYOUTS={
  bed:[
   {n:'Giường giữa tường, 2 tab',pr:1.2,ok:C=>C.W>=230&&C.D>=270,run:C=>{const b=C.wall(C.W>=310&&C.A>=14?'bedK':C.W>=250?'bed2':'bed1','back',.5,{req:1,wt:4});C.beside(b,'night',-1,{wt:.6});C.beside(b,'night',1,{wt:.6});C.wall('ac','back',[.5],{solid:false,wt:.2});C.wall('wardrobe','left',[.85,.15,.5],{wt:2})||C.wall('wardrobe','right',[.85,.15,.5],{wt:2})||C.wall('wardrobe','front',[.1,.9,.5],{wt:2});if(C.A>=11)C.wall('dresser','right',[.5,.2,.8],{wt:.7})||C.wall('vanity','front',[.5,.8],{wt:.7})}},
@@ -3421,7 +3576,7 @@ const LAYOUTS={
  ],
  office:[
   {n:'Bàn quay vào tường',pr:.3,run:C=>{const dk=C.wall('desk','back',[.5,.3],{req:1,wt:2.5});chairAt(C,dk);C.wall('shelf','left',[.5,.2],{wt:.6});C.wall('cabinet','right',[.5,.8],{wt:.5});C.corner('plant','fr',{wt:.2})}},
-  {n:'Bàn giữa phòng, nhìn ra cửa',ok:C=>C.D>=330&&C.W>=270,run:C=>{const dk=C.at('desk',C.W/2,C.D*.38,180,{req:1,wt:2.5});if(dk){C.front(dk,'ochair',-22,{rr:180,wt:.5});C.front(dk,'chair',60,{dx:-35,wt:.3});C.front(dk,'chair',60,{dx:35,wt:.3})}C.wall('shelf','back',[.5,.2,.8],{wt:.7});C.wall('cabinet','back',[0,1],{wt:.4});C.corner('plant','fl',{wt:.2})}},
+  {n:'Bàn giữa phòng, nhìn ra cửa',ok:C=>C.D>=330&&C.W>=270,run:C=>{const dk=C.at('desk',C.W/2,C.D*.38,180,{req:1,wt:2.5});if(dk){C.front(dk,'ochair',-22,{rr:180,wt:.5,ign:dk});C.front(dk,'chair',60,{dx:-35,wt:.3});C.front(dk,'chair',60,{dx:35,wt:.3})}C.wall('shelf','back',[.5,.2,.8],{wt:.7});C.wall('cabinet','back',[0,1],{wt:.4});C.corner('plant','fl',{wt:.2})}},
   {n:'Hai chỗ làm việc',ok:C=>C.W>=300,run:C=>{const a=C.wall('desk','back',0,{w:120,req:1,wt:2}),b=C.wall('desk','back',1,{w:120,req:1,wt:2});chairAt(C,a);chairAt(C,b);C.wall('shelf','front',[.5],{wt:.5})}},
   {n:'Phòng họp',ok:C=>C.W>=360&&C.D>=300,run:C=>{C.at('meeting',C.W/2,C.D/2,C.W>=C.D?0:90,{req:1,wt:3});C.wall('cabinet','back',[.5],{wt:.4});C.wall('tvwall','front',[.5],{solid:false,wt:.4})}},
  ],
@@ -3490,10 +3645,273 @@ function localLayout(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!/(b
 ACT.autoFurnish=()=>{const o=selObj();if(!o||sel.kind!=='room'){toast('Chọn một phòng trước');return}openLayouts(o)};
 ACT.nextLayout=()=>{const o=selObj();if(!o||sel.kind!=='room'){toast('Chọn một phòng trước');return}nextLayout(o)};
 
+/* ================= BIỆT THỰ / SIÊU BIỆT THỰ: đồ cao cấp, vườn Nhật, gym, rạp phim, sân thể thao ================= */
+const LX_GL='#a9cfe3',LX_WT='#7fc8e8',LX_SAND='#e6d29c';
+function lxPl(c,a){c.beginPath();a.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath()}
+{const oi2=CATS.findIndex(c=>c.k==='other');CATS.splice(oi2<0?CATS.length:oi2,0,{k:'lux',n:'Cao cấp & biệt thự'},{k:'japan',n:'Vườn Nhật & thủy cảnh'},{k:'gym',n:'Gym & giải trí'},{k:'sport',n:'Sân thể thao'})}
+for(const k of ['tread','bike','billiard'])if(FURN[k])FURN[k].c='gym';
+Object.assign(FURN,{
+ supercar:{n:'Siêu xe thể thao',c:'lux',w:460,d:200,col:'#d62d20',dr:'supercar'},
+ roadster:{n:'Siêu xe mui trần',c:'lux',w:445,d:195,col:'#f2b705',dr:'supercar',kind:'open'},
+ hypercar:{n:'Siêu xe hypercar',c:'lux',w:475,d:205,col:'#1f3a5f',dr:'supercar'},
+ carlift:{n:'Thang nâng hạ ô tô',c:'lux',w:300,d:580,col:'#a7b0b8',dr:'carlift'},
+ turntable:{n:'Bàn xoay ô tô',c:'lux',w:520,d:520,col:'#c3c8cd',dr:'turntable'},
+ elevRound:{n:'Thang máy tròn (kính)',c:'lux',w:180,d:180,col:'#dfe8ee',dr:'elevRound'},
+ spiral:{n:'Thang xoắn tròn',c:'lux',w:220,d:220,col:'#e8e1d6',dr:'spiral'},
+ grandpiano:{n:'Đàn piano cánh',c:'lux',w:155,d:210,col:'#17181b',dr:'grandpiano'},
+ fireplace:{n:'Lò sưởi',c:'lux',w:170,d:50,col:'#d9d4cc',dr:'fireplace',wall:1},
+ sofaCurve:{n:'Sofa cong cao cấp',c:'lux',w:300,d:120,col:'#e9e1d3',dr:'sofaCurve'},
+ tubFree:{n:'Bồn tắm đặt sàn',c:'lux',w:180,d:85,col:'#ffffff',dr:'tubFree'},
+ sauna:{n:'Phòng xông hơi gỗ',c:'lux',w:220,d:200,col:'#c9935a',dr:'sauna'},
+ closetIsl:{n:'Đảo tủ phòng thay đồ',c:'lux',w:140,d:70,col:'#e2d6c3',dr:'closetIsl'},
+ cellar:{n:'Kệ rượu âm tường',c:'lux',w:200,d:45,col:'#5a3a2a',dr:'cellar',wall:1},
+ cinema:{n:'Ghế rạp phim (3 ghế)',c:'gym',w:270,d:100,col:'#6b2737',dr:'cinema'},
+ screen:{n:'Màn chiếu phim',c:'gym',w:320,d:12,col:'#202226',dr:'screen',wall:1},
+ gymrack:{n:'Giàn tạ đa năng',c:'gym',w:220,d:160,col:'#2b2d31',dr:'gymrack'},
+ wbench:{n:'Ghế tập tạ',c:'gym',w:130,d:55,col:'#2b2d31',dr:'wbench'},
+ dumbbell:{n:'Kệ tạ đơn',c:'gym',w:160,d:45,col:'#3a3d42',dr:'dumbbell',wall:1},
+ rower:{n:'Máy chèo thuyền',c:'gym',w:220,d:60,col:'#3a3d42',dr:'rower'},
+ ellip:{n:'Máy tập elip',c:'gym',w:180,d:75,col:'#4a4f57',dr:'ellip'},
+ yoga:{n:'Thảm yoga',c:'gym',w:185,d:65,col:'#8fb9a8',dr:'yoga'},
+ gymmirror:{n:'Gương phòng tập',c:'gym',w:300,d:6,col:'#cfe6f2',dr:'mirror',wall:1},
+ punch:{n:'Bao cát boxing',c:'gym',w:60,d:60,col:'#b23a2e',dr:'punch'},
+ dryer:{n:'Máy sấy quần áo',c:'bath',w:60,d:62,col:'#f2f3f4',dr:'washer',wall:1},
+ ironing:{n:'Bàn ủi đồ',c:'bath',w:135,d:40,col:'#bcd3e0',dr:'ironing'},
+ clothesrack:{n:'Giá phơi / treo đồ',c:'bath',w:150,d:55,col:'#c7ccd1',dr:'clothesrack'},
+ lsink:{n:'Bồn giặt tay',c:'bath',w:60,d:55,col:'#e8e3dc',dr:'lsink',wall:1},
+ toybox:{n:'Thùng đồ chơi',c:'bed',w:80,d:45,col:'#f2b84b',dr:'toybox',wall:1},
+ kidsbed:{n:'Giường trẻ em',c:'bed',w:95,d:190,col:'#9cc7e8',dr:'kidsbed',wall:1},
+ whiteboard:{n:'Bảng học',c:'bed',w:150,d:6,col:'#ffffff',dr:'whiteboard',wall:1},
+ kidstable:{n:'Bàn ghế mini cho bé',c:'bed',w:110,d:110,col:'#f4d35e',dr:'kidstable'},
+ firepit:{n:'Bếp lửa ngoài trời',c:'outdoor',w:130,d:130,col:'#8d8478',dr:'firepit'},
+ outsofa:{n:'Sofa ngoài trời',c:'outdoor',w:230,d:90,col:'#d9cbb5',dr:FURN.sofa3.dr,wall:1},
+ koi:{n:'Hồ sen cá koi',c:'japan',w:520,d:340,col:LX_WT,dr:'koi'},
+ stream:{n:'Khe suối đá',c:'japan',w:620,d:130,col:LX_WT,dr:'stream'},
+ onsen:{n:'Hồ tắm onsen đá',c:'japan',w:340,d:260,col:'#9fd3df',dr:'onsen'},
+ waterfall:{n:'Thác nước đá',c:'japan',w:220,d:90,col:LX_WT,dr:'waterfall'},
+ zen:{n:'Sân sỏi cào (Zen)',c:'japan',w:420,d:300,col:'#ebe6da',dr:'zen'},
+ lantern:{n:'Đèn đá Tōrō',c:'japan',w:50,d:50,col:'#a9a49a',dr:'lantern'},
+ pine:{n:'Cây tùng bonsai',c:'japan',w:240,d:200,col:'#2f5d3a',dr:'pine'},
+ maple:{n:'Cây phong đỏ',c:'japan',w:280,d:280,col:'#c2412d',dr:'tree'},
+ bamboo:{n:'Hàng tre trúc',c:'japan',w:240,d:70,col:'#7fa650',dr:'bamboo'},
+ bridgeJ:{n:'Cầu gỗ cong',c:'japan',w:320,d:110,col:'#b5452d',dr:'bridgeJ'},
+ tsukubai:{n:'Chậu nước đá',c:'japan',w:70,d:70,col:'#9a958b',dr:'tsukubai'},
+ rock:{n:'Đá cảnh',c:'japan',w:120,d:90,col:'#8e8a83',dr:'rock'},
+ pickle:{n:'Sân pickleball',c:'sport',w:1341,d:610,col:'#3c7dd9',dr:'court',kind:'pickle'},
+ tennis:{n:'Sân tennis',c:'sport',w:2377,d:1097,col:'#2f8f5b',dr:'court',kind:'tennis'},
+ golf:{n:'Sân golf mini (putting)',c:'sport',w:600,d:350,col:'#5aa64a',dr:'golf'},
+});
+CORE_T.add('spiral');CORE_T.add('elevRound');
+Object.assign(ALIAS,{"siêu xe":"supercar","sieu xe":"supercar","lamborghini":"supercar","ferrari":"supercar","mui trần":"roadster","thang nâng":"carlift","nâng hạ":"carlift","bàn xoay":"turntable","thang máy tròn":"elevRound","thang xoắn":"spiral","thang xoăn":"spiral","cầu thang xoắn":"spiral","piano cánh":"grandpiano","lò sưởi":"fireplace","sofa cong":"sofaCurve","bồn tắm đặt sàn":"tubFree","xông hơi":"sauna","sauna":"sauna","đảo tủ":"closetIsl","kệ rượu":"cellar","ghế rạp":"cinema","màn chiếu":"screen","giàn tạ":"gymrack","ghế tập tạ":"wbench","tạ đơn":"dumbbell","máy chèo":"rower","elip":"ellip","thảm yoga":"yoga","yoga":"yoga","bao cát":"punch","máy sấy":"dryer","bàn ủi":"ironing","bàn là":"ironing","giá phơi":"clothesrack","thùng đồ chơi":"toybox","giường trẻ em":"kidsbed","bảng học":"whiteboard","bàn ghế mini":"kidstable","bếp lửa":"firepit","sofa ngoài trời":"outsofa","cá koi":"koi","hồ koi":"koi","hồ sen":"koi","khe suối":"stream","suối":"stream","onsen":"onsen","thác nước":"waterfall","sỏi cào":"zen","vườn thiền":"zen","đèn đá":"lantern","tùng":"pine","bonsai":"pine","phong đỏ":"maple","tre trúc":"bamboo","tre":"bamboo","trúc":"bamboo","cầu gỗ":"bridgeJ","chậu nước đá":"tsukubai","đá cảnh":"rock","pickleball":"pickle","tennis":"tennis","golf":"golf"});
+Object.assign(DR,{
+ supercar(c,w,d,col,F){const tw=d*.12,wl=w*.16;for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*w*.31-wl/2,sy*(d/2-tw/2)-tw/2,wl,tw*(sx<0?1.1:1),3);fs(c,'#1c1d20')}
+  lxPl(c,[[w/2,-d*.3],[w/2-w*.05,-d*.44],[-w/2+w*.06,-d*.48],[-w/2,-d*.42],[-w/2,d*.42],[-w/2+w*.06,d*.48],[w/2-w*.05,d*.44],[w/2,d*.3]]);fs(c,col);
+  if(F.kind==='open'){for(const sy of[-1,1]){rr(c,-w*.14,sy*d*.15-d*.12,w*.16,d*.24,8);fs(c,'#2b2522')}rr(c,w*.04,-d*.34,w*.05,d*.68,4);fs(c,LX_GL)}
+  else{lxPl(c,[[w*.2,-d*.3],[w*.08,-d*.36],[-w*.22,-d*.32],[-w*.26,-d*.22],[-w*.26,d*.22],[-w*.22,d*.32],[w*.08,d*.36],[w*.2,d*.3]]);fs(c,'#1d2733');rr(c,w*.06,-d*.3,w*.12,d*.6,6);fs(c,LX_GL,0)}
+  for(let i=0;i<4;i++)ln(c,-w*.46+i*w*.045,-d*.2,-w*.46+i*w*.045,d*.2);for(const sy of[-1,1]){lxPl(c,[[w/2-2,sy*d*.3],[w/2-w*.09,sy*d*.4],[w/2-w*.1,sy*d*.33]]);fs(c,'#fff6c0',0);rr(c,-w/2+1,sy*d*.36-d*.04,4,d*.08,1);fs(c,'#e22',0);lxPl(c,[[-w*.05,sy*d*.48],[-w*.2,sy*d*.48],[-w*.16,sy*d*.4]]);fs(c,'#22252a',0)}},
+ carlift(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,'#e9ebed');rr(c,-w/2+18,-d/2+24,w-36,d-48,4);fs(c,col);c.save();c.strokeStyle=sh(col,-.2);for(let y=-d/2+34;y<d/2-30;y+=14)ln(c,-w/2+22,y,w/2-22,y);c.restore();for(const sx of[-1,1]){rr(c,sx*(w*.22)-14,-d/2+30,28,d-60,3);fs(c,sh(col,-.15))}for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-9)-9,sy*(d/2-12)-9,18,18,2);fs(c,'#3a3e43')}c.fillStyle='#e8692c';c.font=`700 ${Math.min(w,d)*.12}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('⇅',0,0)},
+ turntable(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'#e3e5e8');circ(c,0,0,r-12);fs(c,col);for(let i=0;i<16;i++){const a=i*PI/8;ln(c,Math.cos(a)*r*.15,Math.sin(a)*r*.15,Math.cos(a)*(r-14),Math.sin(a)*(r-14))}circ(c,0,0,r*.15);fs(c,sh(col,-.25));c.beginPath();c.arc(0,0,r*.72,-.6,.6);c.stroke()},
+ elevRound(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,'#cfd6dc');circ(c,0,0,r-8);fs(c,col);c.save();c.globalAlpha=.6;circ(c,0,0,r-14);fs(c,LX_GL,0);c.restore();const lw=c.lineWidth;c.lineWidth=lw*3;c.beginPath();c.arc(0,0,r-4,PI/2-.5,PI/2+.5);c.strokeStyle='#e8692c';c.stroke();c.lineWidth=lw;c.strokeStyle=INK;c.fillStyle='#4a5159';c.font=`700 ${r*.28}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('TM',0,0)},
+ spiral(c,w,d,col){const r=Math.min(w,d)/2,n=15;circ(c,0,0,r);fs(c,col);for(let i=0;i<n;i++){const a=-PI/2+i*(PI*1.75/n);ln(c,Math.cos(a)*r*.13,Math.sin(a)*r*.13,Math.cos(a)*r,Math.sin(a)*r)}circ(c,0,0,r*.13);fs(c,'#8a8f96');c.save();c.lineWidth*=2;c.beginPath();c.arc(0,0,r-3,-PI/2,-PI/2+PI*1.75);c.stroke();c.restore();c.beginPath();c.arc(0,0,r*.6,-PI/2,PI*1.1);c.stroke();const a=PI*1.1,x=Math.cos(a)*r*.6,y=Math.sin(a)*r*.6;lxPl(c,[[x,y],[x+8,y+2],[x+2,y-8]]);fs(c,INK,0)},
+ grandpiano(c,w,d,col){c.beginPath();c.moveTo(-w/2,-d/2);c.lineTo(w/2,-d/2);c.lineTo(w/2,-d*.05);c.quadraticCurveTo(w*.35,d/2,-w*.05,d/2);c.quadraticCurveTo(-w/2,d/2,-w/2,d*.1);c.closePath();fs(c,col);rr(c,-w/2+6,-d/2-14,w-12,16,2);fs(c,'#f7f7f5');c.save();c.strokeStyle='#222';for(let x=-w/2+12;x<w/2-8;x+=9)ln(c,x,-d/2-14,x,-d/2-4);c.restore();rr(c,-w*.3,-d/2-40,w*.6,20,3);fs(c,'#2a2b2e')},
+ fireplace(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,col);rr(c,-w*.32,-d/2+4,w*.64,d-10,3);fs(c,'#2a2523');for(const [x,s] of [[-w*.1,1],[w*.08,.8],[0,1.2]]){ell(c,x,d*.05,6*s,10*s);fs(c,'#f08a24',0)}},
+ sofaCurve(c,w,d,col){c.beginPath();c.moveTo(-w/2,-d*.05);c.quadraticCurveTo(0,-d*1.05,w/2,-d*.05);c.lineTo(w/2-d*.2,d/2);c.quadraticCurveTo(0,-d*.15,-w/2+d*.2,d/2);c.closePath();fs(c,col);c.beginPath();c.moveTo(-w/2+d*.12,d*.18);c.quadraticCurveTo(0,-d*.62,w/2-d*.12,d*.18);c.stroke()},
+ tubFree(c,w,d,col){ell(c,0,0,w/2,d/2);fs(c,col);ell(c,0,0,w/2-9,d/2-9);fs(c,'#cfe8f3');circ(c,w/2-16,0,4);fs(c,'#b8bcc2')},
+ sauna(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);rr(c,-w/2+6,-d/2+6,w-12,d*.3,2);fs(c,sh(col,-.15));rr(c,-w/2+6,-d/2+6,w*.3,d-12,2);fs(c,sh(col,-.15));rr(c,w/2-40,d/2-40,32,32,3);fs(c,'#3a3d42');c.fillStyle='#5a3a1e';c.font=`700 ${Math.min(w,d)*.12}px sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillText('SAUNA',w*.12,d*.12)},
+ closetIsl(c,w,d,col){rr(c,-w/2,-d/2,w,d,3);fs(c,col);rr(c,-w/2+5,-d/2+5,w-10,d-10,2);fs(c,'rgba(170,205,225,.5)');ln(c,0,-d/2,0,d/2)},
+ cellar(c,w,d,col){rr(c,-w/2,-d/2,w,d,1);fs(c,col);const n=Math.max(3,Math.round(w/14));for(let i=0;i<n;i++)for(const y of[-d*.15,d*.18]){circ(c,-w/2+(i+.5)*w/n,y,Math.min(5,w/n*.35));fs(c,i%3?'#7b1e2b':'#2f4a2c',0)}},
+ cinema(c,w,d,col){const n=3,sw=w/n;for(let i=0;i<n;i++){const x=-w/2+i*sw;rr(c,x+1,-d/2,sw-2,d,6);fs(c,col);rr(c,x+8,-d/2+4,sw-16,d*.3,4);fs(c,sh(col,-.2));rr(c,x+8,-d*.12,sw-16,d*.5,4);fs(c,sh(col,.12))}},
+ screen(c,w,d,col){rr(c,-w/2,-d/2,w,d,1);fs(c,col);c.fillStyle='#8fb3c9';c.fillRect(-w/2+6,-d/2+1,w-12,d-3)},
+ gymrack(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,'#e9eaec');for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-8)-6,sy*(d/2-8)-6,12,12,1);fs(c,col)}c.save();c.lineWidth*=2.5;ln(c,-w/2+8,-d/2+8,w/2-8,-d/2+8);ln(c,-w/2+8,d/2-8,w/2-8,d/2-8);ln(c,-w*.45,-d*.1,w*.45,-d*.1);c.restore();for(const sx of[-1,1]){rr(c,sx*w*.4-6,-d*.1-22,12,44,3);fs(c,'#2b2d31')}rr(c,-18,d*.02,36,d*.38,4);fs(c,'#2b2d31')},
+ wbench(c,w,d,col){rr(c,-w/2,-d*.3,w,d*.6,8);fs(c,col);rr(c,-w/2+4,-d/2,10,d,2);fs(c,'#8a8f96');rr(c,w/2-14,-d/2,10,d,2);fs(c,'#8a8f96')},
+ dumbbell(c,w,d,col){rr(c,-w/2,-d/2,w,d,2);fs(c,'#d9dcdf');const n=Math.max(3,Math.round(w/26));for(let i=0;i<n;i++){const x=-w/2+(i+.5)*w/n;circ(c,x,-d*.2,Math.min(8,w/n*.32));fs(c,col);circ(c,x,d*.2,Math.min(8,w/n*.32));fs(c,col)}},
+ rower(c,w,d,col){rr(c,-w/2+20,-8,w-30,16,4);fs(c,'#9aa3ac');circ(c,w/2-26,0,24);fs(c,col);rr(c,-w*.1,-14,34,28,6);fs(c,'#2b2d31');ln(c,w/2-55,-d/2+4,w/2-55,d/2-4)},
+ ellip(c,w,d,col){rr(c,-w/2,-d*.35,w,d*.7,10);fs(c,'#cfd3d7');ell(c,-w*.1,-d*.18,w*.18,d*.12);fs(c,col);ell(c,-w*.1,d*.18,w*.18,d*.12);fs(c,col);rr(c,w/2-26,-d/2,20,d,4);fs(c,col)},
+ yoga(c,w,d,col){rr(c,-w/2,-d/2,w,d,d*.18);fs(c,col);c.save();c.strokeStyle=sh(col,-.15);for(let x=-w/2+20;x<w/2-10;x+=20)ln(c,x,-d/2+5,x,d/2-5);c.restore()},
+ punch(c,w,d,col){circ(c,0,0,Math.min(w,d)/2);fs(c,col);circ(c,0,0,Math.min(w,d)*.2);fs(c,sh(col,-.3))},
+ ironing(c,w,d,col){lxPl(c,[[-w/2,-d/2],[w*.3,-d/2],[w/2,0],[w*.3,d/2],[-w/2,d/2]]);fs(c,col);rr(c,-w/2+6,-8,22,16,4);fs(c,'#3a6ea5')},
+ clothesrack(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,null);ln(c,-w/2,0,w/2,0);const k=['#e8648a','#2f7de1','#f2c230','#5f9a47','#fff'];for(let i=0;i<7;i++){const x=-w/2+12+i*(w-24)/6;rr(c,x-6,-d*.35,12,d*.7,3);fs(c,k[i%5])}},
+ lsink(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);rr(c,-w/2+7,-d/2+7,w-14,d-14,6);fs(c,'#cfe0e8');circ(c,0,-d/2+6,3);fs(c,'#999')},
+ toybox(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);ln(c,-w/2,-d*.15,w/2,-d*.15);for(const [x,y,k] of [[-w*.25,d*.15,'#e8648a'],[0,d*.2,'#2f7de1'],[w*.25,d*.12,'#5f9a47']]){circ(c,x,y,5);fs(c,k,0)}},
+ kidsbed(c,w,d,col){rr(c,-w/2,-d/2,w,d,8);fs(c,col);rr(c,-w/2+6,-d/2+6,w-12,d-12,6);fs(c,'#ffffff');rr(c,-w/2+12,-d/2+12,w-24,d*.16,6);fs(c,'#ffe08a');for(const [x,y] of [[-w*.2,d*.1],[w*.15,d*.25],[-w*.05,d*.38]]){circ(c,x,y,4);fs(c,'#f2b84b',0)}c.save();c.lineWidth*=2;ln(c,w/2-3,-d*.15,w/2-3,d*.3);c.restore()},
+ whiteboard(c,w,d,col){rr(c,-w/2,-d/2,w,d,1);fs(c,col)},
+ kidstable(c,w,d,col){const r=Math.min(w,d)*.28;circ(c,0,0,r);fs(c,col);const k=['#e8648a','#2f7de1','#5f9a47','#f2b84b'];for(let i=0;i<4;i++){const a=i*PI/2;rr(c,Math.cos(a)*(r+16)-11,Math.sin(a)*(r+16)-11,22,22,5);fs(c,k[i])}},
+ firepit(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,col);circ(c,0,0,r*.68);fs(c,'#3a3330');for(const [x,y,s] of [[0,0,1],[-r*.2,r*.1,.7],[r*.2,-r*.05,.8]]){ell(c,x,y,r*.13*s,r*.22*s);fs(c,'#f08a24',0)}},
+ koi(c,w,d,col){const pts=[];for(let i=0;i<28;i++){const a=i/28*2*PI,k=1+.1*Math.sin(3*a)+.06*Math.cos(5*a+1);pts.push([Math.cos(a)*w/2*k*.92,Math.sin(a)*d/2*k*.9])}lxPl(c,pts);fs(c,'#b8ad98');lxPl(c,pts.map(p=>[p[0]*.9,p[1]*.88]));fs(c,col,'#5c8aa3');for(let i=0;i<28;i+=2){const p=pts[i];circ(c,p[0]*.95,p[1]*.94,Math.min(w,d)*.035);fs(c,'#8f8a80')}
+  for(const [x,y,r] of [[-w*.22,-d*.12,20],[-w*.12,d*.18,16],[w*.2,d*.15,22],[w*.28,-d*.2,15]]){c.beginPath();c.moveTo(x,y);c.arc(x,y,r,.3,2*PI-.1);c.closePath();fs(c,'#5e9e4c','#3c6e33')}for(const [x,y] of [[-w*.08,d*.22],[w*.12,d*.22]]){circ(c,x,y,7);fs(c,'#f3a6c4','#c76a90')}
+  for(const [x,y,a,k] of [[w*.02,-d*.05,.4,'#f2762e'],[-w*.25,d*.05,2.6,'#ffffff'],[w*.15,-d*.25,1.2,'#f2762e']]){c.save();c.translate(x,y);c.rotate(a);ell(c,0,0,12,5);fs(c,k,0);lxPl(c,[[-11,0],[-19,-5],[-19,5]]);fs(c,k,0);circ(c,4,-1,2);fs(c,k==='#ffffff'?'#f2762e':'#fff',0);c.restore()}},
+ stream(c,w,d,col){const P=[];for(let i=0;i<=24;i++){const x=-w/2+i*w/24;P.push([x,Math.sin(i/24*PI*2.2)*d*.22])}c.save();c.lineCap='round';c.lineJoin='round';c.beginPath();P.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.lineWidth=d*.6;c.strokeStyle='#b8ad98';c.stroke();c.lineWidth=d*.42;c.strokeStyle=col;c.stroke();c.restore();for(let i=1;i<24;i+=2){const p=P[i],s=i%4?1:-1;circ(c,p[0],p[1]+s*d*.3,d*.07+((i*7)%5));fs(c,'#8f8a80')}c.save();c.strokeStyle='rgba(255,255,255,.8)';for(let i=2;i<22;i+=3){const p=P[i];ln(c,p[0]-6,p[1]-3,p[0]+6,p[1]+2)}c.restore()},
+ onsen(c,w,d,col){const pts=[];for(let i=0;i<24;i++){const a=i/24*2*PI,k=1+.07*Math.sin(2*a+.5)+.05*Math.cos(4*a);pts.push([Math.cos(a)*w/2*k*.95,Math.sin(a)*d/2*k*.93])}lxPl(c,pts);fs(c,'#8a8378');lxPl(c,pts.map(p=>[p[0]*.8,p[1]*.76]));fs(c,col,'#6e9aa6');for(let i=0;i<24;i++){const p=pts[i];circ(c,p[0]*.88,p[1]*.85,Math.min(w,d)*.06);fs(c,i%2?'#9b958b':'#7f796f')}c.save();c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth*=1.4;for(const [x,y] of [[-w*.12,-d*.05],[w*.05,d*.08],[w*.15,-d*.12]]){c.beginPath();c.moveTo(x,y+10);c.quadraticCurveTo(x+8,y,x,y-10);c.quadraticCurveTo(x-8,y-20,x,y-28);c.stroke()}c.restore()},
+ waterfall(c,w,d,col){rr(c,-w/2,-d/2,w,d*.45,8);fs(c,'#8e8a83');for(const x of [-w*.35,-w*.1,w*.2,w*.38]){circ(c,x,-d*.25,d*.2);fs(c,'#7a766f')}rr(c,-w*.2,-d*.1,w*.4,d*.6,6);fs(c,col,'#5c8aa3');c.save();c.strokeStyle='rgba(255,255,255,.85)';for(let x=-w*.17;x<w*.18;x+=9)ln(c,x,-d*.08,x,d*.45);c.restore()},
+ zen(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);c.save();c.strokeStyle=sh(col,-.12);const rocks=[[-w*.25,-d*.1,26],[w*.18,d*.12,20],[w*.3,-d*.25,14]];for(let y=-d/2+10;y<d/2-5;y+=10){c.beginPath();for(let x=-w/2+4;x<=w/2-4;x+=8){let yy=y;for(const [rx,ry,r] of rocks){const dd=Math.hypot(x-rx,y-ry);if(dd<r*2.4)yy=ry+(y-ry)*r*2.4/Math.max(dd,1)*.0+y*0}x===-w/2+4?c.moveTo(x,yy):c.lineTo(x,yy)}c.stroke()}for(const [rx,ry,r] of rocks){for(let k=1;k<4;k++){circ(c,rx,ry,r+k*9);c.fillStyle=col;c.fill();c.stroke()}}c.restore();for(const [rx,ry,r] of rocks){circ(c,rx,ry,r);fs(c,'#7d786f')}},
+ lantern(c,w,d,col){rr(c,-w/2,-d/2,w,d,4);fs(c,col);lxPl(c,[[0,-d*.42],[d*.42,0],[0,d*.42],[-d*.42,0]]);fs(c,sh(col,.15));rr(c,-w*.14,-d*.14,w*.28,d*.28,2);fs(c,'#ffe6a8')},
+ pine(c,w,d,col){c.save();c.strokeStyle='#6b4a2b';c.lineWidth*=3;ln(c,-w*.3,d*.25,w*.05,0);ln(c,w*.05,0,w*.3,-d*.2);ln(c,w*.05,0,-w*.1,-d*.3);c.restore();for(const [x,y,rx,ry] of [[-w*.3,d*.22,w*.2,d*.14],[w*.3,-d*.22,w*.19,d*.13],[-w*.1,-d*.3,w*.17,d*.12],[w*.08,d*.05,w*.15,d*.11]]){ell(c,x,y,rx,ry);fs(c,col,sh(col,-.4));ell(c,x-rx*.2,y-ry*.2,rx*.6,ry*.5);fs(c,sh(col,.12),0)}},
+ bamboo(c,w,d,col){const n=Math.max(4,Math.round(w/18));for(let i=0;i<n;i++){const x=-w/2+(i+.5)*w/n,y=((i*37)%10-5)/10*d*.4;c.save();c.strokeStyle=sh(col,-.25);for(let k=0;k<3;k++){const a=(i*1.7+k*2.1);ln(c,x,y,x+Math.cos(a)*16,y+Math.sin(a)*16)}c.restore();circ(c,x,y,Math.min(6,w/n*.35));fs(c,col,sh(col,-.35))}},
+ bridgeJ(c,w,d,col){rr(c,-w/2,-d/2,w,d,d*.2);fs(c,sh(col,.45));c.save();c.strokeStyle=sh(col,.1);for(let x=-w/2+12;x<w/2-6;x+=12)ln(c,x,-d/2+10,x,d/2-10);c.restore();for(const sy of[-1,1]){rr(c,-w/2,sy*(d/2-5)-5,w,10,4);fs(c,col)}for(const sx of[-1,1])for(const sy of[-1,1]){rr(c,sx*(w/2-8)-7,sy*(d/2-5)-7,14,14,2);fs(c,sh(col,-.3))}},
+ tsukubai(c,w,d,col){const r=Math.min(w,d)/2;circ(c,0,0,r);fs(c,col);circ(c,0,0,r*.5);fs(c,'#7fc8e8');c.save();c.strokeStyle='#8aa15a';c.lineWidth*=3;ln(c,r*.5,-r*.5,r*1.2,-r*1.2);c.restore()},
+ rock(c,w,d,col){lxPl(c,[[-w*.45,-d*.1],[-w*.2,-d*.45],[w*.25,-d*.4],[w*.48,0],[w*.3,d*.42],[-w*.15,d*.45],[-w*.5,d*.2]]);fs(c,col);lxPl(c,[[-w*.2,-d*.3],[w*.15,-d*.28],[w*.05,d*.05]]);fs(c,sh(col,.18),0)},
+ court(c,w,d,col,F){rr(c,-w/2,-d/2,w,d,2);fs(c,col,0);c.save();c.strokeStyle='#ffffff';c.lineWidth=5;c.strokeRect(-w/2+3,-d/2+3,w-6,d-6);ln(c,0,-d/2,0,d/2);
+  if(F.kind==='tennis'){const s=d*.125;ln(c,-w/2,-d/2+s,w/2,-d/2+s);ln(c,-w/2,d/2-s,w/2,d/2-s);const sl=w*.27;ln(c,-sl,-d/2+s,-sl,d/2-s);ln(c,sl,-d/2+s,sl,d/2-s);ln(c,-sl,0,sl,0)}
+  else{const k=213;c.fillStyle='rgba(255,255,255,.12)';c.fillRect(-k,-d/2,2*k,d);ln(c,-k,-d/2,-k,d/2);ln(c,k,-d/2,k,d/2);ln(c,-w/2,0,-k,0);ln(c,k,0,w/2,0)}
+  c.strokeStyle='#22252a';c.lineWidth=7;ln(c,0,-d/2-25,0,d/2+25);c.restore()},
+ golf(c,w,d,col){const pts=[];for(let i=0;i<20;i++){const a=i/20*2*PI,k=1+.08*Math.sin(3*a);pts.push([Math.cos(a)*w/2*k*.92,Math.sin(a)*d/2*k*.9])}lxPl(c,pts);fs(c,col,sh(col,-.3));ell(c,w*.3,d*.18,w*.1,d*.12);fs(c,LX_SAND,0);for(const [x,y] of [[-w*.25,-d*.1],[w*.1,-d*.2],[w*.05,d*.22]]){circ(c,x,y,5);fs(c,'#222',0);c.save();c.strokeStyle='#333';ln(c,x,y,x,y-30);c.restore();lxPl(c,[[x,y-30],[x+16,y-25],[x,y-20]]);fs(c,'#e33',0)}},
+});
+/* --- loại phòng mới --- */
+RTYPES.unshift(
+ {n:'Phòng trẻ em',c:'#e6eff7',f:'wood',k:['trẻ em','phòng bé','kids']},
+ {n:'Phòng học cho bé',c:'#eef0e3',f:'wood',k:['học tập','phòng học','study']},
+ {n:'Phòng gym',c:'#e2e4e7',f:'tile',k:['gym','tập thể','thể hình','fitness']},
+ {n:'Phòng xem phim',c:'#cfc6cf',f:'wood',k:['phim','cinema','rạp','karaoke','giải trí']},
+ {n:'Phòng giặt ủi',c:'#e3edf1',f:'tile',k:['giặt','ủi','laundry']},
+ {n:'Ăn ngoài trời',c:'#e7e0cf',f:'tile',k:['ăn ngoài trời','bbq','nướng']},
+ {n:'Vườn Nhật',c:'#dfe8cf',f:'plain',k:['vườn nhật','zen','nhật bản']},
+ {n:'Onsen',c:'#e2ddd2',f:'tile',k:['onsen','tắm khoáng']},
+ {n:'Sân pickleball',c:'#dfe6d9',f:'plain',k:['pickleball','tennis','golf','thể thao']},
+ {n:'Spa – xông hơi',c:'#efe6da',f:'wood',k:['spa','xông hơi','sauna']},
+ {n:'Hầm rượu',c:'#e8ddd2',f:'wood',k:['rượu','wine','cellar']},
+ {n:'Phòng thay đồ',c:'#efe7da',f:'wood',k:['thay đồ','closet','walk']},
+ {n:'Garage siêu xe',c:'#e2e3e5',f:'tile',k:['siêu xe','gara','garage']},
+ {n:'Ban công sân vườn',c:'#e1ebd7',f:'tile',k:['ban công sân vườn']},
+);
+function rtypeX(n){if(/tre em|phong be|kids|con nit/.test(n))return'kids';if(/hoc tap|phong hoc|study/.test(n))return'study';if(/gym|the hinh|tap the|fitness/.test(n))return'gym';if(/phim|cinema|\brap\b|karaoke|giai tri/.test(n))return'cinema';if(/giat|\bui\b|laundry/.test(n))return'laundry';if(/an ngoai troi|bbq|nuong/.test(n))return'outdine';if(/vuon nhat|\bzen\b|nhat ban|japan/.test(n))return'jgarden';if(/onsen|tam khoang/.test(n))return'onsen';if(/pickleball|tennis|golf|the thao/.test(n))return'sport';if(/\bspa\b|xong hoi|sauna/.test(n))return'spa';if(/ruou|wine|cellar/.test(n))return'wine';if(/thay do|closet|walk/.test(n))return'closet';return null}
+const kidsChair=(C,dk)=>dk&&(C.front(dk,'chair',-12,{wt:.3,ign:dk})||C.front(dk,'chair',3,{wt:.3}));
+Object.assign(LCAP,{kids:6,study:4.5,gym:6,cinema:5,laundry:4,outdine:5,jgarden:9,onsen:5,sport:4,spa:5,wine:4,closet:5});
+Object.assign(LAYOUTS,{
+ kids:[
+  {n:'Giường tầng + góc chơi',pr:1,run:C=>{const b=C.wall('bunk','back',[0,1,.5],{req:1,wt:3});C.beside(b,'toybox',1,{wt:.6})||C.beside(b,'toybox',-1,{wt:.6});const dk=C.wall('kidsdesk','right',[.5,.3,.7],{wt:1.4})||C.wall('kidsdesk','front',[.8,.2],{wt:1.4});kidsChair(C,dk);C.at('playmat',C.W/2,C.D*.62,0,{w:Math.min(200,C.W-140),d:Math.min(160,C.D-200),solid:false,wt:.4,noDoor:1});C.wall('wardrobe','front',[.1,.9],{w:120,wt:1.4})||C.wall('wardrobe','left',[1],{w:120,wt:1.4});C.wall('shelf','left',[.5],{wt:.4})}},
+  {n:'Giường trẻ em + lều chơi',pr:.6,run:C=>{const b=C.wall('kidsbed','back',[0,.1],{req:1,wt:3});C.beside(b,'night',1,{wt:.4});C.corner('tent','fr',{wt:.8});C.at('kidstable',C.W*.55,C.D*.55,0,{wt:.8})||C.free('kidstable',{wt:.8});C.wall('toybox','left',[.7,.5],{wt:.5});C.wall('wardrobe','front',[0,.2],{w:120,wt:1.4})}},
+  {n:'Hai giường trẻ em',pr:.2,ok:C=>C.W>=300,run:C=>{const a=C.wall('kidsbed','back',0,{req:1,wt:2}),b=C.wall('kidsbed','back',1,{req:1,wt:2});if(a&&b)C.at('toybox',C.W/2,FURN.toybox.d/2,0,{side:'back',wt:.4});const dk=C.wall('kidsdesk','front',[.5],{w:140,wt:1.2});kidsChair(C,dk);C.wall('wardrobe','left',[.8,.5],{w:120,wt:1.2})}},
+ ],
+ study:[
+  {n:'Hai bàn học + bảng',pr:1,run:C=>{const a=C.wall('kidsdesk','back',[.2,0],{req:1,wt:1.6}),b=C.wall('kidsdesk','back',[.8,1],{wt:1.4});kidsChair(C,a);kidsChair(C,b);C.wall('whiteboard','left',[.5],{wt:.6});C.wall('shelf','right',[.5,.2],{wt:.6});C.at('playmat',C.W/2,C.D*.7,0,{w:160,d:120,solid:false,wt:.2,noDoor:1})}},
+  {n:'Bàn học quay cửa sổ',pr:.6,run:C=>{const dk=C.wall('kidsdesk','back',.5,{w:140,req:1,wt:1.8});kidsChair(C,dk);C.wall('shelf','left',[.4],{wt:.6});C.wall('shelf','right',[.4],{wt:.5});C.wall('whiteboard','front',[.5],{wt:.4});C.corner('plant','fr',{wt:.2})}},
+  {n:'Bàn tròn học nhóm',pr:.2,run:C=>{C.at('kidstable',C.W/2,C.D/2,0,{req:1,wt:1.6});C.wall('whiteboard','back',[.5],{wt:.6});C.wall('shelf','left',[.5],{wt:.6});C.wall('toybox','right',[.5],{wt:.4})}},
+ ],
+ gym:[
+  {n:'Cardio dọc tường + khu tạ',pr:1,run:C=>{const t=C.wall('tread','back',[0,.1],{req:1,wt:1.4,rt:0});C.beside(t,'ellip',1,{gap:25,wt:1});C.wall('bike','back',[1,.8],{wt:.8});C.corner('gymrack','fr',{rt:180,wt:1.5});C.wall('dumbbell','left',[.7,.5],{wt:.8});C.wall('gymmirror','right',[.4,.2],{solid:false,wt:.4});C.free('wbench',{near:[C.W*.3,C.D*.75],wt:.6});C.free('yoga',{near:[C.W*.5,C.D*.5],solid:false,wt:.3})}},
+  {n:'Khu tạ giữa phòng, gương lớn',pr:.6,run:C=>{C.wall('gymmirror','back',[.5],{w:Math.min(400,C.W-40),solid:false,wt:.6});C.at('gymrack',C.W/2,C.D*.5,0,{req:1,wt:1.6});C.wall('dumbbell','back',[.1,.9],{wt:.8});C.wall('tread','front',[0,.2],{wt:1});C.wall('rower','left',[.5],{wt:.6})||C.wall('bike','left',[.5],{wt:.6});C.corner('punch','fr',{wt:.4})}},
+  {n:'Yoga + cardio nhẹ',pr:.3,run:C=>{C.wall('gymmirror','back',[.5],{w:Math.min(400,C.W-40),solid:false,wt:.5});for(const f of [.25,.5,.75])C.at('yoga',C.W*f,C.D*.45,90,{solid:false,wt:.5});C.wall('bike','front',[.15],{wt:.8});C.wall('ellip','front',[.85],{wt:.8});C.corner('plant','bl',{wt:.2});C.corner('plant','br',{wt:.2})}},
+ ],
+ cinema:[
+  {n:'Rạp 2 hàng ghế',pr:1,run:C=>{C.wall('screen','back',[.5],{w:Math.min(360,C.W-60),solid:false,req:1,wt:1});C.at('cinema',C.W/2,C.D*.55,180,{req:1,wt:1.6});C.at('cinema',C.W/2,C.D*.55+130,180,{wt:1.2});C.corner('side','fl',{wt:.2});C.wall('ac','front',[.5],{solid:false,wt:.1})}},
+  {n:'Sofa xem phim + bàn trà',pr:.6,run:C=>{C.wall('screen','back',[.5],{w:Math.min(320,C.W-60),solid:false,req:1,wt:1});const s=C.wall(C.W>=340?'sofa3':'sofa2','front',[.5],{req:1,wt:2});if(s)C.front(s,'coffee',35,{rr:0,wt:.6});C.wall('tv','back',[.5],{w:200,wt:.3});C.corner('plant','bl',{wt:.2})}},
+  {n:'Phòng giải trí: phim + bi-a',pr:-.6,ok:C=>C.A>=24,run:C=>{C.wall('screen','back',[.5],{w:300,solid:false,wt:1});const s=C.at('sofaL',C.W*.3,C.D*.42,180,{wt:2});C.free('billiard',{near:[C.W*.6,C.D*.8],wt:1.4});C.wall('bar','right',[.5],{wt:.8})}},
+ ],
+ laundry:[
+  {n:'Giặt sấy cạnh nhau + bàn ủi',pr:1,run:C=>{const w=C.wall('washer','back',[0,.1],{req:1,wt:1.5});C.beside(w,'dryer',1,{wt:1.2});C.wall('lsink','back',[1,.8],{wt:.6});C.free('ironing',{near:[C.W/2,C.D*.6],wt:.8});C.wall('clothesrack','front',[.5,.2],{wt:.6})||C.wall('clothesrack','left',[.5],{wt:.6});C.wall('shelf','right',[.5],{wt:.4})}},
+  {n:'Giặt ủi chữ L',pr:.5,run:C=>{const w=C.wall('washer','left',[0],{req:1,wt:1.5});C.beside(w,'dryer',1,{wt:1.2});C.wall('counter','back',[1],{w:Math.min(160,C.W-80),wt:.8});C.wall('ironing','right',[.6],{wt:.8});C.wall('clothesrack','front',[.6],{wt:.6})}},
+ ],
+ outdine:[
+  {n:'Bàn ăn dài + bếp nướng',pr:1,run:C=>{const t=C.at(C.W>=420?'dining8':'dining6',C.W/2,C.D*.55,C.W>=C.D?0:90,{req:1,wt:2});if(t)C.at('pergola',t.u,t.v,0,{w:Math.min(C.W-20,t.hw*2+80),d:Math.min(C.D-20,t.hd*2+80),solid:false,wt:.4,noDoor:1});C.wall('bbq','back',[.5,.2,.8],{wt:1});C.corner('plant','bl',{wt:.2});C.corner('plant','br',{wt:.2});C.corner('lampg','fl',{wt:.1});C.corner('lampg','fr',{wt:.1})}},
+  {n:'Sofa ngoài trời + bếp lửa',pr:.6,run:C=>{const s=C.wall('outsofa','back',[.3,.5],{req:1,wt:1.5});if(s)C.front(s,'firepit',50,{rr:0,wt:1});C.free('dining6',{near:[C.W*.75,C.D*.65],wt:1.5})||C.free('patio',{near:[C.W*.75,C.D*.65],wt:1});C.corner('parasol','fr',{solid:false,wt:.2})}},
+  {n:'Bàn tròn + quầy bar ngoài trời',pr:.3,run:C=>{C.at('round4',C.W*.4,C.D*.55,0,{req:1,wt:1.6});C.wall('bar','right',[.4],{wt:1});C.wall('bbq','back',[.2],{wt:.8});C.corner('tree','fl',{solid:false,wt:.2})}},
+ ],
+ jgarden:[
+  {n:'Hồ sen cá koi + khe suối + cầu gỗ',pr:1,run:C=>{const kw=Math.min(520,C.W*.5),kd=Math.min(340,C.D*.45);const k=C.at('koi',C.W*.42,C.D*.58,0,{w:kw,d:kd,req:1,wt:3});C.at('stream',C.W*.62,C.D*.2,0,{w:Math.min(620,C.W*.55),d:120,wt:1.5});if(k)C.at('bridgeJ',k.u+kw*.32,k.v-kd*.15,90,{w:Math.min(300,kd*.9),solid:false,wt:.6});C.corner('maple','bl',{solid:false,wt:.6});C.corner('pine','fr',{wt:.6});C.wall('bamboo','left',[.5,.2,.8],{w:Math.min(300,C.D-60),wt:.5});C.at('lantern',C.W*.15,C.D*.62,0,{wt:.3});C.at('lantern',C.W*.78,C.D*.75,0,{wt:.3});C.at('tsukubai',C.W*.88,C.D*.4,0,{wt:.3});C.at('stepping',C.W*.75,C.D*.9,0,{w:Math.min(360,C.W*.4),solid:false,wt:.2,noDoor:1});C.at('rock',C.W*.22,C.D*.82,0,{wt:.2})}},
+  {n:'Vườn thiền sỏi cào',pr:.6,run:C=>{C.at('zen',C.W*.45,C.D*.5,0,{w:Math.min(C.W*.6,520),d:Math.min(C.D*.55,360),req:1,wt:2.5,solid:false,noDoor:1});C.wall('bamboo','back',[.5],{w:Math.min(C.W-80,400),wt:.6});C.corner('pine','br',{wt:.6});C.corner('maple','fl',{solid:false,wt:.6});C.at('lantern',C.W*.85,C.D*.6,0,{wt:.3});C.at('tsukubai',C.W*.12,C.D*.3,0,{wt:.3});C.at('stepping',C.W*.5,C.D*.92,0,{w:Math.min(400,C.W*.5),solid:false,wt:.2,noDoor:1})}},
+  {n:'Thác nước đổ xuống hồ koi',pr:.4,run:C=>{const f=C.wall('waterfall','back',[.4,.5],{req:1,wt:1.5});const k=C.at('koi',C.W*.42,(f?f.v+f.hd:90)+Math.min(340,C.D*.45)/2-15,0,{w:Math.min(520,C.W*.55),d:Math.min(340,C.D*.45),req:1,wt:3});if(k)C.at('bridgeJ',k.u,k.v+k.hd-10,0,{w:Math.min(260,k.hw*1.2),solid:false,wt:.5});C.corner('maple','br',{solid:false,wt:.6});C.corner('pine','bl',{wt:.6});C.at('lantern',C.W*.82,C.D*.35,0,{wt:.3});C.wall('bamboo','right',[.5],{w:Math.min(260,C.D-60),wt:.4})}},
+ ],
+ onsen:[
+  {n:'Hồ onsen đá + vách tre',pr:1,run:C=>{C.at('onsen',C.W/2,C.D*.48,0,{w:Math.min(380,C.W-120),d:Math.min(300,C.D-150),req:1,wt:3});C.wall('bamboo','back',[.5],{w:Math.min(C.W-40,420),wt:.6});C.corner('lantern','bl',{wt:.3});C.corner('lantern','br',{wt:.3});C.wall('outshower','left',[.8],{wt:.4});C.corner('rock','fr',{wt:.2});C.wall('lounger','front',[.2],{wt:.4})||C.wall('gbench','front',[.2],{wt:.3})}},
+  {n:'Onsen + bồn ngâm lạnh + xông hơi',pr:.5,ok:C=>C.W>=480,run:C=>{C.at('onsen',C.W*.35,C.D*.5,0,{w:Math.min(320,C.W*.5),d:Math.min(260,C.D-120),req:1,wt:3});C.corner('jacuzzi','fr',{wt:1});C.corner('sauna','br',{wt:1});C.corner('lantern','bl',{wt:.3});C.wall('bamboo','front',[.2],{w:200,wt:.3})}},
+ ],
+ sport:[
+  {n:'Sân pickleball tiêu chuẩn',pr:1,run:C=>{const rot=C.W>=C.D?0:90,ok=C.at('pickle',C.W/2,C.D/2,rot,{req:1,wt:3,noDoor:1});if(ok){const long=rot?'left':'back';C.wall('gbench',rot?'left':'back',[.3],{wt:.3});C.wall('gbench',rot?'right':'front',[.7],{wt:.3})}for(const k of ['bl','br','fl','fr'])C.corner('lampg',k,{wt:.05})}},
+  {n:'Sân tennis',pr:.5,ok:C=>C.A>=600,run:C=>{C.at('tennis',C.W/2,C.D/2,C.W>=C.D?0:90,{req:1,wt:3,noDoor:1});C.corner('gbench','bl',{wt:.2})}},
+  {n:'Sân golf mini + pickleball',pr:.3,ok:C=>C.W>=2100||C.D>=2100,run:C=>{const hz=C.W>=C.D;C.at('pickle',hz?FURN.pickle.w/2+80:C.W/2,hz?C.D/2:FURN.pickle.w/2+80,hz?0:90,{req:1,wt:3,noDoor:1});C.free('golf',{near:hz?[C.W-350,C.D/2]:[C.W/2,C.D-250],wt:1.2})}},
+ ],
+ spa:[
+  {n:'Xông hơi + bồn tắm + ghế thư giãn',pr:1,run:C=>{C.corner('sauna','bl',{req:1,wt:1.8});C.at('tubFree',C.W*.65,C.D*.35,0,{wt:1.2})||C.free('tubFree',{wt:1.2});C.wall('lounger','front',[.3,.7],{wt:.6});C.corner('plant','fr',{wt:.2});C.wall('outshower','right',[.8],{wt:.4})}},
+  {n:'Spa: jacuzzi + xông hơi',pr:.6,run:C=>{C.corner('jacuzzi','br',{req:1,wt:1.6});C.corner('sauna','bl',{wt:1.6});C.wall('lounger','front',[.5],{wt:.6});C.wall('basin','left',[.9],{wt:.3})}},
+ ],
+ wine:[
+  {n:'Kệ rượu quanh tường + bàn nếm',pr:1,run:C=>{C.wall('cellar','back',[.5],{w:Math.min(C.W-40,360),req:1,wt:1.5});C.wall('cellar','left',[.5],{w:Math.min(C.D-80,300),wt:1});C.wall('cellar','right',[.5],{w:Math.min(C.D-80,300),wt:1});C.at('round4',C.W/2,C.D*.6,0,{wt:1.2})||C.free('bar',{wt:1})}},
+  {n:'Quầy bar + tủ rượu',pr:.5,run:C=>{const b=C.wall('cellar','back',[.5],{w:Math.min(C.W-40,300),req:1,wt:1.5});C.front(b,'bar',60,{rr:0,wt:1.2});C.wall('wine','left',[.3,.7],{wt:.6});C.free('stool',{near:[C.W/2,C.D*.75],wt:.2})}},
+ ],
+ closet:[
+  {n:'Tủ quanh phòng + đảo tủ',pr:1,run:C=>{C.wall('wardrobe','back',[.5],{w:Math.min(C.W-20,300),req:1,wt:1.5});C.wall('wardrobe','left',[.5],{w:Math.min(C.D-80,240),wt:1.2});C.wall('wardrobe','right',[.5],{w:Math.min(C.D-80,240),wt:1.2});C.at('closetIsl',C.W/2,C.D*.58,0,{wt:1});C.wall('mirror','front',[.2,.8],{wt:.3})}},
+  {n:'Tủ chữ U + bàn trang điểm',pr:.5,run:C=>{C.wall('wardrobe','left',[.5],{w:Math.min(C.D-40,280),req:1,wt:1.4});C.wall('wardrobe','right',[.5],{w:Math.min(C.D-40,280),wt:1.4});C.wall('vanity','back',[.5],{wt:.8});C.free('side',{wt:.2})}},
+ ],
+});
+LAYOUTS.garage.unshift({n:'Garage siêu xe + thang nâng',pr:1.2,ok:C=>C.W>=600&&C.D>=520,run:C=>{const L=C.at('carlift',FURN.carlift.w/2+30,C.D/2,0,{req:1,wt:2});C.at('supercar',FURN.carlift.w+60+FURN.supercar.d/2,C.D/2,90,{req:1,wt:1.5});if(C.W>=1000)C.at('turntable',C.W-FURN.turntable.w/2-40,C.D/2,0,{wt:1.2})&&C.at('roadster',C.W-FURN.turntable.w/2-40,C.D/2,90,{solid:false,wt:.8});else C.free('hypercar',{rt:[90],near:[C.W-120,C.D/2],wt:1});C.wall('evchg','back',[.5,.3],{wt:.3});C.wall('toolcab','front',[1,.8],{wt:.3})}});
+LAYOUTS.living.unshift({n:'Phòng khách biệt thự: lò sưởi + piano cánh',pr:.2,ok:C=>C.A>=28&&C.W>=480&&C.D>=480,run:C=>{const f=C.wall('fireplace','back',[.4,.5],{req:1,wt:1.2});if(f){const s=C.front(f,'sofaCurve',220,{wt:2.2});C.front(f,'coffee',110,{rr:0,wt:.6});C.rel(f,'armchair',-140,140,270,{wt:.5});C.rel(f,'armchair',140,140,90,{wt:.5});C.front(f,'rug',90,{rr:0,w:280,d:200,solid:false,noDoor:1,wt:.2})}C.corner('grandpiano','fr',{rt:180,wt:1.2});C.wall('display','left',[.3,.7],{wt:.4});C.corner('plant','bl',{wt:.2})}});
+LAYOUTS.bath.unshift({n:'WC master: bồn tắm đặt sàn + lavabo đôi',pr:.4,ok:C=>C.A>=7&&C.W>=250,run:C=>{C.at('tubFree',C.W/2,C.D*.38,0,{req:1,wt:2});C.wall('basin2','left',[.5,.2],{wt:1.4});C.wall('toilet','right',[.8,.5],{wt:1.4});C.corner('shower','fl',{wt:1.1})||C.corner('shower','br',{wt:1.1});C.corner('plant','fr',{wt:.2})}});
+LAYOUTS.balcony.unshift({n:'Ban công sân vườn (cỏ + hoa + ghế)',pr:1,run:C=>{C.at('lawn',C.W/2,C.D/2,0,{w:C.W-20,d:C.D-20,solid:false,noDoor:1,wt:.6});C.wall('flowerbed','front',[.5,.2],{w:Math.min(C.W-60,320),wt:.6});C.corner('plant','bl',{wt:.3});C.corner('bush','br',{wt:.3});const s=C.at('side',C.W*.3,C.D*.45,0,{wt:.3});if(s){C.rel(s,'armchair',-60,0,90,{wt:.5});C.rel(s,'armchair',60,0,270,{wt:.5})}}},{n:'Ban công hồ cá + tre (kiểu Nhật)',pr:.5,ok:C=>C.A>=6,run:C=>{C.at('pond',C.W*.35,C.D/2,0,{w:Math.min(240,C.W*.45),d:Math.min(160,C.D-40),req:1,wt:1.2});C.wall('bamboo','front',[.8],{w:Math.min(200,C.W*.35),wt:.5});C.corner('lantern','fr',{wt:.3});C.wall('gbench','back',[.85],{wt:.4})}});
+{const r0=rtype;rtype=function(r){return rtypeX(norm(r.name))||r0(r)}}
+/* --- cụm phòng sẵn để chèn vào bản vẽ --- */
+const BLOCKS=[
+ {n:'Phòng ngủ master + WC + phòng thay đồ',ic:'👑',w:620,h:660,b:K=>{K.R('WC master',0,0,340,240);K.R('Phòng thay đồ',340,0,280,240);K.R('Phòng ngủ master',0,240,620,420,{main:1});K.D(170,240,80);K.D(480,240,80);K.D(540,660,90);K.W(0,450,180,'glass');K.W(170,0,60,'small')}},
+ {n:'Phòng ngủ có WC riêng',ic:'🛏',w:420,h:560,b:K=>{K.R('WC',0,0,220,200);K.P('Phòng ngủ',[[220,0],[420,0],[420,560],[0,560],[0,200],[220,200]],{main:1});K.D(110,200,75);K.D(360,560,90);K.W(0,380,140);K.W(110,0,50,'small')}},
+ {n:'Phòng ngủ khách + WC',ic:'🧳',w:380,h:520,b:K=>{K.R('WC khách',0,0,200,190);K.P('Phòng ngủ khách',[[200,0],[380,0],[380,520],[0,520],[0,190],[200,190]],{main:1});K.D(100,190,75);K.D(320,520,85);K.W(0,360,120)}},
+ {n:'Phòng trẻ em',ic:'🧸',w:420,h:400,b:K=>{K.R('Phòng trẻ em',0,0,420,400,{main:1});K.D(360,400,85);K.W(210,0,140)}},
+ {n:'Phòng học cho bé',ic:'📚',w:360,h:330,b:K=>{K.R('Phòng học cho bé',0,0,360,330,{main:1});K.D(300,330,85);K.W(180,0,140)}},
+ {n:'Phòng làm việc',ic:'💼',w:360,h:400,b:K=>{K.R('Phòng làm việc',0,0,360,400,{main:1});K.D(300,400,85);K.W(180,0,140)}},
+ {n:'Phòng gym',ic:'🏋',w:560,h:460,b:K=>{K.R('Phòng gym',0,0,560,460,{main:1});K.D(490,460,90);K.W(280,0,240,'glass')}},
+ {n:'Phòng xem phim',ic:'🎬',w:480,h:660,b:K=>{K.R('Phòng xem phim',0,0,480,660,{main:1});K.D(420,660,90)}},
+ {n:'Phòng giặt ủi',ic:'🧺',w:280,h:320,b:K=>{K.R('Phòng giặt ủi',0,0,280,320,{main:1});K.D(220,320,80);K.W(140,0,60,'small')}},
+ {n:'Phòng thay đồ',ic:'👗',w:360,h:320,b:K=>{K.R('Phòng thay đồ',0,0,360,320,{main:1});K.D(300,320,80)}},
+ {n:'Spa – xông hơi',ic:'🧖',w:540,h:420,b:K=>{K.R('Spa – xông hơi',0,0,540,420,{main:1});K.D(470,420,90);K.W(270,0,160)}},
+ {n:'Hầm rượu',ic:'🍷',w:420,h:380,b:K=>{K.R('Hầm rượu',0,0,420,380,{main:1});K.D(360,380,90)}},
+ {n:'Garage siêu xe + thang nâng',ic:'🏎',w:1100,h:700,b:K=>{K.R('Garage siêu xe',0,0,1100,700,{main:1});K.D(550,700,500,'garage')}},
+ {n:'Phòng khách biệt thự (lò sưởi, piano)',ic:'🛋',w:820,h:660,b:K=>{K.R('Phòng khách',0,0,820,660,{main:1});K.D(700,660,140,'main');K.W(0,330,300,'glass');K.W(410,0,360,'glass')}},
+ {n:'Phòng ăn ngoài trời',ic:'🍖',w:620,h:460,b:K=>{K.R('Ăn ngoài trời',0,0,620,460,{walls:false,main:1})}},
+ {n:'Ban công sân vườn',ic:'🌿',w:620,h:240,b:K=>{K.R('Ban công sân vườn',0,0,620,240,{walls:false,main:1})}},
+ {n:'Sân pickleball',ic:'🏓',w:1600,h:900,b:K=>{K.R('Sân pickleball',0,0,1600,900,{walls:false,main:1})}},
+ {n:'Vườn Nhật: khe suối + hồ sen cá koi',ic:'🎏',w:1300,h:900,b:K=>{K.R('Vườn Nhật',0,0,1300,900,{walls:false,main:1})}},
+ {n:'Hồ tắm onsen',ic:'♨',w:640,h:520,b:K=>{K.R('Onsen',0,0,640,520,{walls:false,main:1})}},
+];
+function blockKit(ox,oy){const K={rooms:[],main:null};
+ K.R=(name,x,y,w,h,o={})=>K.P(name,[[x,y],[x+w,y],[x+w,y+h],[x,y+h]],o);
+ K.P=(name,pts,o={})=>{const r=createRoom(pts.map(p=>[ox+p[0],oy+p[1]]),uniqName(name),{t:o.t||15,walls:o.walls!==false});K.rooms.push({r,o});if(o.main)K.main=r;return r};
+ K.D=(x,y,w,type)=>placeOpening('door',type||'single',ox+x,oy+y,w,30);
+ K.W=(x,y,w,type)=>placeOpening('window',type||'win',ox+x,oy+y,w,30);
+ K.I=(type,x,y,rot=0,o={})=>addItem(type,ox+x,oy+y,{rot,...o});
+ K.finish=()=>{for(const {r,o} of K.rooms)if(o.furn!==false)furnishRoom(r)};
+ return K}
+function insertBlock(B){const pts=[...S.walls.flatMap(w=>[[w.x1,w.y1],[w.x2,w.y2]]),...S.rooms.flatMap(r=>r.pts),...S.items.map(i=>[i.x,i.y])];let ox=0,oy=0;if(pts.length){const b=bbox(pts);ox=Math.ceil((b.x2+150)/10)*10;oy=Math.round(b.y1/10)*10}
+ const K=blockKit(ox,oy);B.b(K);K.finish();commit();if(K.main)setSel('room',K.main.id);fit();toast(`Đã chèn “${B.n}” bên phải bản vẽ — kéo phòng để đặt đúng chỗ`,3500)}
+function modalBlocks(){const m=modal(`<div class="row" style="justify-content:space-between;margin-bottom:6px"><h3 style="margin:0">➕ Chèn phòng mẫu (đã bố trí sẵn)</h3><button class="btn sm" id="bkX">✕</button></div><p class="muted" style="margin:0 0 10px">Phòng được chèn bên phải bản vẽ, có tường, cửa và nội thất theo mẫu. Kéo cả phòng để đặt đúng chỗ, bấm 🔀 Kiểu khác để đổi cách bố trí.</p><div class="bkgrid">${BLOCKS.map((b,i)=>`<button class="lyc" data-bk="${i}"><span style="font-size:24px">${b.ic}</span><b>${esc(b.n)}</b><small>${fmtLen(b.w)} × ${fmtLen(b.h)}</small></button>`).join('')}</div>`);m.querySelector('.mbox').classList.add('wide');$('#bkX').onclick=closeModal;m.querySelectorAll('[data-bk]').forEach(el=>el.onclick=()=>{closeModal();insertBlock(BLOCKS[+el.dataset.bk])})}
+/* --- mẫu biệt thự nhiều tầng --- */
+function buildFloors(t){S=Object.assign(blank(),{name:t.n,pid:S.pid,seq:S.seq});normFloors();S.sync=false;sel=null;cancelOps();const ids=[];
+ t.floors.forEach((fd,i)=>{let f;if(i===0){f=curFl();f.lv=fd.lv;f.name=fd.name||flName(fd.lv);f.h=fd.h||320}else{f={id:newFloorId(),name:fd.name||flName(fd.lv),lv:fd.lv,h:fd.h||320,data:{walls:[],openings:[],rooms:[],items:[],texts:[],dims:[]}};S.fl.push(f);switchFloor(f.id,true)}
+  const K=blockKit(0,0);fd.b(K);K.finish();for(const w of detectExt())w.t=22;S.walls.forEach(clampOpenings);for(const w of S.walls)w.h=f.h;ids.push(f.id)});
+ for(const f of S.fl){const d=flData(f);d.items.forEach(it=>{if(CORE_T.has(it.type))it.sy=1});d.rooms.forEach(r=>{if(/thang/.test(norm(r.name)))r.sy=1})}
+ S.sync=true;const g=S.fl.find(f=>f.lv===0)||S.fl[0];if(g.id!==S.cf)switchFloor(g.id,true);commit();fit()}
+const CORE=(K,x,y)=>{K.R('Lõi thang',x,y,400,600,{furn:false});K.I('spiral',x+200,y+150,0);K.I('elevRound',x+200,y+420,180);K.D(x+200,y,90)};
+TPL.push(
+ {n:'Biệt thự 2 tầng 12 × 20 m',d:'Garage, vườn Nhật, master có WC + thay đồ, phòng trẻ em, học, gym',ic:'🏡',floors:[
+  {lv:0,b:K=>{K.R('Phòng khách',0,0,700,700);K.R('Bếp + ăn',700,0,500,700);K.R('Hành lang',0,700,1200,200,{furn:false});K.R('Phòng ngủ khách',0,900,450,450);K.R('WC khách',0,1350,450,200);K.R('Lõi thang',450,900,300,650,{furn:false});K.I('stairs',600,1190,180,{w:110,d:380});K.I('elevator',600,1460,180,{w:150,d:150});K.R('Phòng giặt ủi',750,900,450,300);K.R('Phòng làm việc',750,1200,450,350);K.R('Garage',0,1550,1200,550);
+   K.D(350,700,90);K.D(950,700,90);K.D(225,900,85);K.D(225,1350,75);K.D(600,900,100);K.D(975,900,80);K.D(975,1200,85);K.D(600,1550,100);K.D(600,2100,450,'garage');K.D(1200,800,120,'main');
+   K.W(350,0,300,'glass');K.W(950,0,200);K.W(0,1120,140);K.W(1200,1380,140);K.W(0,350,200);
+   K.R('Vườn Nhật',0,-900,750,850,{walls:false});K.R('Ăn ngoài trời',800,-650,400,600,{walls:false})}},
+  {lv:1,b:K=>{K.R('Phòng ngủ master',0,0,700,700);K.R('WC master',700,0,500,400);K.R('Phòng thay đồ',700,400,500,300);K.R('Hành lang',0,700,1200,200,{furn:false});K.R('Phòng trẻ em',0,900,450,650);K.R('Lõi thang',450,900,300,650,{furn:false});K.I('stairs',600,1190,180,{w:110,d:380});K.I('elevator',600,1460,180,{w:150,d:150});K.R('WC chung',750,900,450,250);K.R('Phòng học cho bé',750,1150,450,400);K.R('Phòng gym',0,1550,1200,550);
+   K.D(350,700,90);K.D(700,200,80);K.D(700,550,80);K.D(225,900,85);K.D(600,900,100);K.D(975,900,75);K.D(975,1150,85);K.D(600,1550,100);
+   K.W(350,0,260,'glass');K.W(950,0,80,'small');K.W(0,1220,160);K.W(1200,1350,160);K.W(600,2100,400,'glass');K.R('Ban công sân vườn',0,-250,700,250,{walls:false});K.D(350,0,180,'sliding')}}]},
+ {n:'Siêu biệt thự 3 tầng + hầm',d:'Garage siêu xe thang nâng, rạp phim, hầm rượu, gym, onsen, vườn Nhật suối + hồ koi, pickleball, thang máy tròn, thang xoắn',ic:'🏰',floors:[
+  {lv:0,h:360,b:K=>{K.R('Phòng khách',0,0,1000,700);K.R('Phòng ăn',1000,0,600,700);K.R('Bếp',1600,0,800,700);K.R('Hành lang',0,700,2400,200,{furn:false});K.R('Sảnh',0,900,600,600,{furn:false});K.I('plant',80,980);K.I('plant',520,980);K.I('shoe',300,1470,180);K.R('Phòng làm việc',600,900,500,600);CORE(K,1100,900);K.R('Phòng ngủ khách',1500,900,500,600);K.R('WC khách',2000,900,400,300);K.R('Phòng giặt ủi',2000,1200,400,300);
+   K.D(500,700,120,'double');K.D(1300,700,120,'double');K.D(2000,700,100);K.D(300,900,160,'double');K.D(850,900,90);K.D(1750,900,90);K.D(2200,900,75);K.D(2200,1200,80);K.D(300,1500,160,'main');
+   K.W(0,350,300,'glass');K.W(500,0,500,'glass');K.W(1300,0,360,'glass');K.W(2000,0,300);K.W(2400,1050,120);K.W(850,1500,200);K.W(1750,1500,220);
+   K.R('Vườn Nhật',0,1650,1400,1000,{walls:false});K.R('Sân hồ bơi',0,-1000,1300,950,{walls:false,furn:false});K.I('poolL',650,-560,0,{w:900,d:500});K.I('lounger2',300,-180,180);K.I('lounger2',1000,-180,180);K.I('parasol',1180,-880);
+   K.R('Onsen',1350,-760,600,710,{walls:false});K.R('Ăn ngoài trời',2000,-760,700,710,{walls:false});K.R('Sân pickleball',2600,0,1600,900,{walls:false});K.R('Sân đỗ xe',1500,1650,1000,700,{walls:false,furn:false});K.I('supercar',1750,2000,90);K.I('hypercar',2150,2000,90)}},
+  {lv:-1,h:340,b:K=>{K.R('Garage siêu xe',0,0,1100,1500);K.R('Phòng xem phim',1100,0,600,700);K.R('Hầm rượu',1700,0,700,700);K.R('Hành lang hầm',1100,700,1300,200,{furn:false});CORE(K,1100,900);K.R('Phòng gym',1500,900,900,600);
+   K.D(1100,800,120);K.D(1400,700,90);K.D(2050,700,90);K.D(1950,900,100)}},
+  {lv:1,b:K=>{K.R('Phòng ngủ master',0,0,900,700);K.R('WC master',900,0,450,700);K.R('Phòng thay đồ',1350,0,400,700);K.R('Phòng sinh hoạt chung',1750,0,650,700);K.R('Hành lang',0,700,2400,200,{furn:false});K.R('Phòng trẻ em',0,900,550,600);K.R('Phòng học cho bé',550,900,550,600);CORE(K,1100,900);K.R('Phòng trẻ em 2',1500,900,550,600);K.R('WC chung',2050,900,350,600);
+   K.D(450,700,100);K.D(900,350,90);K.D(1350,350,90);K.D(2050,700,120);K.D(275,900,85);K.D(825,900,85);K.D(1775,900,85);K.D(2225,900,75);
+   K.W(0,350,240,'glass');K.W(1100,0,120,'small');K.W(2050,0,300,'glass');K.W(275,1500,180);K.W(825,1500,180);K.W(1775,1500,180);
+   K.R('Ban công sân vườn',0,-260,900,260,{walls:false});K.D(450,0,240,'sliding')}},
+  {lv:2,b:K=>{K.R('Spa – xông hơi',0,0,700,700);K.R('Phòng ngủ khách',700,0,600,700);K.R('WC khách',1300,0,300,700);K.R('Phòng làm việc',1600,0,800,700);K.R('Hành lang',0,700,2400,200,{furn:false});K.R('Phòng giải trí karaoke',0,900,1100,600);CORE(K,1100,900);K.R('Ban công sân vườn',1500,900,900,600,{walls:false});
+   K.D(350,700,100);K.D(1000,700,90);K.D(1300,350,75);K.D(2000,700,90);K.D(550,900,120,'double');K.D(1500,1200,200,'sliding');
+   K.W(350,0,240,'glass');K.W(1000,0,200);K.W(2000,0,260,'glass');K.W(550,1500,300,'glass')}}]},
+);
+{const lt0=loadTemplate;loadTemplate=async function(t){if(!t.floors)return lt0(t);if((S.walls.length||S.items.length||(S.fl&&S.fl.length>1))&&!await confirmBox('Thay mặt bằng hiện tại bằng mẫu “'+t.n+'”? (Có thể hoàn tác)'))return;buildFloors(t);$('#pname').value=S.name;toast(`Đã tải mẫu ${t.n} — ${S.fl.length} tầng, bấm tên tầng ở góc trái để xem từng tầng`,4200)}}
+
+const BLOCK_RE=[[/vuon nhat|ca koi|khe suoi|ho sen/,17],[/onsen/,18],[/pickleball|san the thao/,16],[/garage sieu xe|garage thang nang/,12],[/an ngoai troi/,14],[/ban cong (co )?san vuon|ban cong vuon/,15],[/master/,0],[/(ngu|phong) (co|dinh|lien|kem|voi) (lien )?(wc|ve sinh|toilet)|wc rieng/,1],[/ngu khach/,2],[/xem phim|rap phim|cinema/,7],[/\bgym\b|the hinh|tap the/,6],[/giat ui|phong giat/,8],[/tre em/,3],[/hoc (tap )?cho be|phong hoc/,4],[/lam viec/,5],[/thay do/,9],[/\bspa\b|xong hoi|sauna/,10],[/ham ruou|ruou vang/,11],[/khach biet thu|lo suoi|piano canh/,13]];
+function localBlock(text){const n=norm(text).replace(/\s+/g,' ').trim();if(!/(^| )(them|chen|tao|lam|xay)( |$)/.test(n)||/(noi that|do dac|bo tri)/.test(n))return null;for(const [re,i] of BLOCK_RE)if(re.test(n)){insertBlock(BLOCKS[i]);return {msg:`Đã chèn “${BLOCKS[i].n}” bên phải bản vẽ, đã có tường, cửa và nội thất. Kéo phòng để đặt đúng chỗ.`}}return null}
+
 /* ================= Khởi động ================= */
 function init(){const saved=LS.get('mb_cur',null);if(saved&&Array.isArray(saved.walls))S=Object.assign(blank(),saved);$('#pname').value=S.name||'';const bg=LS.get('mb_bg',null);if(bg&&bg.src){const img=new Image();img.onload=()=>{BG={...bg,img};refresh()};img.src=bg.src}
  histReset();resize();aiUI();chatWelcome();renderOpts();$('#sHint').textContent=HINTS.select;refresh();requestAnimationFrame(()=>{resize();fit()});updStatus()}
-window.__mb={get S(){return S},V,applyActions,setTool,fit,hitTest,render,exportCanvas,planMD,parseAI,sysPrompt,localCmd,b3plan,b3opts,switchFloor,addFloor,undo,redo,planVariants,applyVariant,openLayouts,FURN,arcG,rpoly};
+window.__mb={get S(){return S},V,applyActions,setTool,fit,hitTest,render,exportCanvas,planMD,parseAI,sysPrompt,localCmd,b3plan,b3opts,insertBlock,BLOCKS,TPL,loadTemplate:t=>loadTemplate(t),switchFloor,addFloor,undo,redo,planVariants,applyVariant,openLayouts,FURN,arcG,rpoly};
 init();
 })();
 </script>
